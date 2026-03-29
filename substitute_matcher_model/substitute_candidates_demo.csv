@@ -1,0 +1,13 @@
+candidate_teacher_id,candidate_subject_specialization,candidate_secondary_specialization,candidate_experience_years,candidate_has_taught_this_grade,candidate_has_taught_this_class_before,candidate_is_available,candidate_current_daily_load,candidate_current_weekly_load,candidate_consecutive_lessons_today,candidate_gap_before_lesson,candidate_gap_after_lesson,candidate_room_distance_score,candidate_recent_substitutions_count,candidate_burnout_risk_score,candidate_schedule_disruption_score,candidate_prefers_grade_band
+T_DEMO_100,Физика,Информатика,5,1,1,1,2,18,0,1,0,0.2,0,0.2,0.1,high
+T_DEMO_101,Физика,None,7,0,0,1,3,18,4,1,0,0.30000000000000004,0,0.30000000000000004,0.1,high
+T_DEMO_102,Физика,None,9,1,0,1,4,18,0,1,0,0.4,0,0.4,0.1,high
+T_DEMO_103,Математика,Информатика,11,0,0,1,2,18,4,1,0,0.5,0,0.5,0.1,high
+T_DEMO_104,Математика,None,13,1,0,1,3,18,0,1,0,0.6000000000000001,0,0.2,0.1,high
+T_DEMO_105,Математика,None,15,0,0,1,4,18,4,1,0,0.2,0,0.30000000000000004,0.1,high
+T_DEMO_106,Биология,Информатика,17,1,0,1,2,18,0,1,0,0.30000000000000004,0,0.4,0.1,high
+T_DEMO_107,Биология,None,19,0,0,1,3,18,4,1,0,0.4,0,0.5,0.1,high
+T_DEMO_108,Биология,None,21,1,0,1,4,18,0,1,0,0.5,0,0.2,0.1,high
+T_DEMO_109,Биология,Информатика,23,0,0,1,2,18,4,1,0,0.6000000000000001,0,0.30000000000000004,0.1,high
+T_DEMO_110,Биология,None,25,1,0,1,3,18,0,1,0,0.2,0,0.4,0.1,high
+T_DEMO_111,Биология,None,27,0,0,0,4,18,4,1,0,0.30000000000000004,0,0.5,0.1,high

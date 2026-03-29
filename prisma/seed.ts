@@ -180,6 +180,32 @@ async function main() {
                 settings: { create: { emailAlerts: true, pushAlerts: false } },
             },
         }),
+        prisma.user.create({
+            data: {
+                username: "parent2",
+                passwordHash,
+                role: UserRole.parent,
+                firstName: "Динара",
+                lastName: "Воронова",
+                fullName: "Динара Воронова",
+                email: "parent2@aqbobek.kz",
+                homePath: "/parent",
+                settings: { create: { emailAlerts: true, pushAlerts: true } },
+            },
+        }),
+        prisma.user.create({
+            data: {
+                username: "parent3",
+                passwordHash,
+                role: UserRole.parent,
+                firstName: "Ерлан",
+                lastName: "Абишев",
+                fullName: "Ерлан Абишев",
+                email: "parent3@aqbobek.kz",
+                homePath: "/parent",
+                settings: { create: { emailAlerts: false, pushAlerts: true } },
+            },
+        }),
     ]);
 
     const userMap = Object.fromEntries(users.map((item) => [item.username, item]));
@@ -229,11 +255,21 @@ async function main() {
         prisma.teacher.create({ data: { userId: userMap.teacher3.id, bio: "История Казахстана" } }),
     ]);
 
-    await prisma.parentStudent.create({
-        data: {
-            parentId: userMap.parent1.id,
-            studentId: student1.id,
-        },
+    await prisma.parentStudent.createMany({
+        data: [
+            {
+                parentId: userMap.parent1.id,
+                studentId: student1.id,
+            },
+            {
+                parentId: userMap.parent2.id,
+                studentId: student2.id,
+            },
+            {
+                parentId: userMap.parent3.id,
+                studentId: student3.id,
+            },
+        ],
     });
 
     await prisma.teachingAssignment.createMany({

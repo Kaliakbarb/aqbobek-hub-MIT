@@ -23,6 +23,8 @@ const accounts = [
     { username: "teacher2", label: "Teacher Two", role: "Учитель", icon: BookOpen, accent: "bg-emerald-500/10 text-emerald-700" },
     { username: "teacher3", label: "Teacher Three", role: "Учитель", icon: BookOpen, accent: "bg-emerald-500/10 text-emerald-700" },
     { username: "parent1", label: "Parent One", role: "Родитель", icon: HeartPulse, accent: "bg-rose-500/10 text-rose-700" },
+    { username: "parent2", label: "Parent Two", role: "Родитель", icon: HeartPulse, accent: "bg-rose-500/10 text-rose-700" },
+    { username: "parent3", label: "Parent Three", role: "Родитель", icon: HeartPulse, accent: "bg-rose-500/10 text-rose-700" },
     { username: "admin", label: "Admin", role: "Администрация", icon: Shield, accent: "bg-slate-900/10 text-slate-800" },
 ];
 
@@ -100,7 +102,7 @@ export default function LoginPage() {
 
                         <div className="mt-10 space-y-4">
                             {[
-                                "8 готовых аккаунтов для теста ролей",
+                                "10 готовых аккаунтов для теста ролей",
                                 "Вход через backend с cookie-сессией",
                                 "Маршруты защищены по ролям",
                             ].map((item) => (
@@ -120,7 +122,7 @@ export default function LoginPage() {
                             Войдите под нужным аккаунтом
                         </h2>
                         <p className="mt-4 text-base leading-7 text-muted-foreground">
-                            Логины: `student1`, `student2`, `student3`, `teacher1`, `teacher2`, `teacher3`, `parent1`, `admin`. Пароль у всех: `12345`.
+                            Логины: `student1`, `student2`, `student3`, `teacher1`, `teacher2`, `teacher3`, `parent1`, `parent2`, `parent3`, `admin`. Пароль у всех: `12345`.
                         </p>
 
                         <div className="mt-8 rounded-[28px] border border-slate-200 bg-slate-50/90 p-5">

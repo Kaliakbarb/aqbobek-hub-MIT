@@ -1,0 +1,38 @@
+{
+    "numerical_cols": [
+        "topic_difficulty",
+        "recent_avg_score_topic",
+        "historical_avg_score_topic",
+        "recent_avg_score_subject",
+        "missed_classes_topic",
+        "assignment_completion_rate",
+        "quiz_attempts_topic",
+        "improvement_trend",
+        "days_since_last_topic_assessment",
+        "related_topic_mastery",
+        "exam_proximity_days",
+        "engagement_score"
+    ],
+    "categorical_cols": [
+        "grade_level",
+        "subject_name",
+        "topic_name"
+    ],
+    "all_features": [
+        "topic_difficulty",
+        "recent_avg_score_topic",
+        "historical_avg_score_topic",
+        "recent_avg_score_subject",
+        "missed_classes_topic",
+        "assignment_completion_rate",
+        "quiz_attempts_topic",
+        "improvement_trend",
+        "days_since_last_topic_assessment",
+        "related_topic_mastery",
+        "exam_proximity_days",
+        "engagement_score",
+        "grade_level",
+        "subject_name",
+        "topic_name"
+    ]
+}

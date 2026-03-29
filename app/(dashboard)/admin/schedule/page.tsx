@@ -16,6 +16,36 @@ type SchedulePayload = {
     plan: { id: string; status: "draft" | "published"; published: boolean } | null;
     classes: ScheduleClass[];
     conflicts: Array<{ id: string; title: string; description: string; severity: string; resolved: boolean }>;
+    quality: {
+        overall_quality_score: number;
+        quality_band_label: "low" | "medium" | "high";
+        quality_band_label_ru: string;
+        interpretation_ru: string;
+        recommendation: string;
+        metrics: {
+            room_conflict_count: number;
+            teacher_conflict_count: number;
+            class_conflict_count: number;
+            avg_teacher_gaps_per_week: number;
+            schedule_balance_score: number;
+            substitution_resilience_score: number;
+        };
+    } | null;
+    substituteMatch: {
+        absentTeacher: { teacherId: string; teacherName: string };
+        lesson: { slotId: string; subjectName: string; className: string; timeLabel: string; room: string };
+        candidates: Array<{
+            candidate_teacher_id: string;
+            teacherName: string;
+            candidate_subject_specialization: string;
+            candidate_secondary_specialization: string | null;
+            predicted_substitute_fit_score: number;
+            fit_label: "low" | "medium" | "high";
+            fit_label_ru: string;
+            explanation_ru: string;
+            availability: boolean;
+        }>;
+    } | null;
 };
 
 export default function SmartSchedule() {
@@ -75,6 +105,13 @@ export default function SmartSchedule() {
         () => schedule?.classes.find((item) => item.name === selectedClass)?.slots ?? [],
         [schedule, selectedClass],
     );
+    const quality = schedule?.quality ?? null;
+    const substituteMatch = schedule?.substituteMatch ?? null;
+    const qualityTone = quality?.quality_band_label === "high"
+        ? "text-green-700 bg-green-500/10 border-green-200"
+        : quality?.quality_band_label === "medium"
+            ? "text-amber-700 bg-amber-500/10 border-amber-200"
+            : "text-red-700 bg-red-500/10 border-red-200";
 
     return (
         <div className="space-y-6 animate-fadeUp h-full flex flex-col">
@@ -207,6 +244,45 @@ export default function SmartSchedule() {
                     <div className="liquid-glass p-5 rounded-2xl bg-white/50 border border-primary/10">
                         {generated ? (
                             <div className="space-y-4">
+                                {quality && (
+                                    <>
+                                        <div className={`rounded-2xl border p-4 ${qualityTone}`}>
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div>
+                                                    <p className="text-xs font-bold uppercase tracking-wider opacity-80">Schedule Quality Predictor</p>
+                                                    <h3 className="text-3xl font-sora font-bold mt-2">{quality.overall_quality_score}</h3>
+                                                </div>
+                                                <span className="rounded-full bg-white/70 px-2.5 py-1 text-xs font-bold">
+                                                    {quality.quality_band_label_ru}
+                                                </span>
+                                            </div>
+                                            <p className="text-sm mt-3 leading-relaxed">{quality.interpretation_ru}</p>
+                                            <p className="text-xs mt-3 font-medium opacity-90">{quality.recommendation}</p>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-2 text-xs">
+                                            <div className="rounded-xl border border-border bg-black/5 p-3">
+                                                <p className="text-muted-foreground">Баланс</p>
+                                                <p className="font-bold text-foreground mt-1">{Math.round(quality.metrics.schedule_balance_score * 100)}%</p>
+                                            </div>
+                                            <div className="rounded-xl border border-border bg-black/5 p-3">
+                                                <p className="text-muted-foreground">Устойчивость</p>
+                                                <p className="font-bold text-foreground mt-1">{Math.round(quality.metrics.substitution_resilience_score * 100)}%</p>
+                                            </div>
+                                            <div className="rounded-xl border border-border bg-black/5 p-3">
+                                                <p className="text-muted-foreground">Окна учителей</p>
+                                                <p className="font-bold text-foreground mt-1">{quality.metrics.avg_teacher_gaps_per_week}</p>
+                                            </div>
+                                            <div className="rounded-xl border border-border bg-black/5 p-3">
+                                                <p className="text-muted-foreground">Конфликты</p>
+                                                <p className="font-bold text-foreground mt-1">
+                                                    {quality.metrics.room_conflict_count + quality.metrics.teacher_conflict_count + quality.metrics.class_conflict_count}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+
                                 <div className="flex items-start gap-3">
                                     <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />
                                     <p className="text-sm font-medium text-green-900 leading-snug">
@@ -226,11 +302,62 @@ export default function SmartSchedule() {
                                     ))}
                                 </div>
 
+                                {substituteMatch && (
+                                    <>
+                                        <div className="h-[1px] w-full bg-border"></div>
+
+                                        <div className="space-y-3">
+                                            <h4 className="text-xs font-bold text-muted-foreground uppercase">Smart Substitute Teacher Matcher</h4>
+                                            <div className="rounded-xl border border-blue-100 bg-blue-50/70 p-3 text-xs text-blue-950">
+                                                <p className="font-bold">Отсутствует: {substituteMatch.absentTeacher.teacherName}</p>
+                                                <p className="mt-1">
+                                                    Нужно заменить урок {substituteMatch.lesson.subjectName} у {substituteMatch.lesson.className}
+                                                    {" "}в {substituteMatch.lesson.timeLabel}, кабинет {substituteMatch.lesson.room}.
+                                                </p>
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                {substituteMatch.candidates.map((candidate) => (
+                                                    <div key={candidate.candidate_teacher_id} className="rounded-xl border border-border bg-white/70 p-3">
+                                                        <div className="flex items-start justify-between gap-3">
+                                                            <div>
+                                                                <p className="text-sm font-semibold text-foreground">{candidate.teacherName}</p>
+                                                                <p className="text-xs text-muted-foreground mt-1">
+                                                                    {candidate.candidate_subject_specialization}
+                                                                    {candidate.candidate_secondary_specialization ? ` • ${candidate.candidate_secondary_specialization}` : ""}
+                                                                </p>
+                                                            </div>
+                                                            <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                                                                candidate.fit_label === "high"
+                                                                    ? "bg-green-500/10 text-green-700"
+                                                                    : candidate.fit_label === "medium"
+                                                                        ? "bg-amber-500/10 text-amber-700"
+                                                                        : "bg-red-500/10 text-red-700"
+                                                            }`}>
+                                                                {candidate.fit_label_ru}
+                                                            </span>
+                                                        </div>
+                                                        <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+                                                            <span className="rounded-full bg-black/5 px-2 py-1">
+                                                                fit {Math.round(candidate.predicted_substitute_fit_score * 100)}%
+                                                            </span>
+                                                            <span className={`rounded-full px-2 py-1 ${candidate.availability ? "bg-green-500/10 text-green-700" : "bg-red-500/10 text-red-700"}`}>
+                                                                {candidate.availability ? "свободен" : "занят"}
+                                                            </span>
+                                                        </div>
+                                                        <p className="mt-2 text-xs text-muted-foreground leading-relaxed">{candidate.explanation_ru}</p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+
                                 <button
                                     onClick={() => void publishSchedule()}
-                                    className={`w-full py-2 rounded-xl text-xs font-bold transition-colors mt-2 ${published ? "bg-green-500 text-white" : "bg-black/5 hover:bg-black/10 text-foreground"}`}
+                                    className={`w-full py-2 rounded-xl text-xs font-bold transition-colors mt-2 ${published ? "bg-green-500 text-white" : quality?.quality_band_label === "low" ? "bg-red-500 text-white hover:bg-red-600" : "bg-black/5 hover:bg-black/10 text-foreground"}`}
                                 >
-                                    {published ? "Опубликовано для всех ролей" : "Опубликовать для всех"}
+                                    {published ? "Опубликовано для всех ролей" : quality?.quality_band_label === "low" ? "Лучше пересобрать расписание" : "Опубликовать для всех"}
                                 </button>
                             </div>
                         ) : (

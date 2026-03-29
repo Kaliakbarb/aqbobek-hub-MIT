@@ -1,36 +1,64 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AqbobekHub Demo
 
-## Getting Started
+Next.js demo-платформа школы с ролями ученика, учителя, родителя и администрации.
 
-First, run the development server:
+## Запуск
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Откройте [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Demo Login
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `student1 / 12345`
+- `student2 / 12345`
+- `student3 / 12345`
+- `teacher1 / 12345`
+- `admin / 12345`
+- `parent1 / 12345`
+- `parent2 / 12345`
+- `parent3 / 12345`
 
-## Learn More
+## Mock BilimClass API
 
-To learn more about Next.js, take a look at the following resources:
+Для защиты добавлен реалистичный mock BilimClass API.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Что он умеет:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- отдаёт живые demo-данные из локальной базы;
+- показывает несколько учеников, классов и предметов;
+- покрывает сценарии `сильный ученик`, `рисковый ученик`, `пропуски`, `падение оценок`;
+- быстро работает локально без внешних зависимостей;
+- подходит как единая точка входа для демонстрации ML-пайплайна.
 
-## Deploy on Vercel
+### Маршруты
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- `GET /api/mock/bilimclass`
+- `GET /api/mock/bilimclass/students`
+- `GET /api/mock/bilimclass/classes`
+- `GET /api/mock/bilimclass/students/:studentId`
+- `GET /api/mock/bilimclass/students/:studentId/grades`
+- `GET /api/mock/bilimclass/students/:studentId/attendance`
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Идеальный demo flow
+
+1. Backend получает оценки и посещаемость из `mock BilimClass API`.
+2. Эти данные идут в `Topic Weakness Detector`.
+3. Затем слабая тема передаётся в `Personalized Resource Recommender`.
+4. Админка отдельно получает план расписания.
+5. `Schedule Quality Predictor` оценивает качество расписания.
+6. Если есть больничный учителя, `Smart Substitute Teacher Matcher` предлагает замены.
+
+## ML API Routes
+
+- `GET /api/student/topic-weakness`
+- `POST /api/student/topic-weakness`
+- `GET /api/student/resource-recommendations`
+- `POST /api/student/resource-recommendations`
+- `GET /api/admin/schedule/quality`
+- `POST /api/admin/schedule/quality`
+- `GET /api/admin/schedule/substitutes`
+- `POST /api/admin/schedule/substitutes`
