@@ -1,110 +1,144 @@
-import React from "react";
+import Image from "next/image";
 import Link from "next/link";
-import { GraduationCap, BookOpen, Users, Shield, ArrowRight } from "lucide-react";
+import logo from "../../logo.png";
+import {
+    ArrowRight,
+    BookOpen,
+    CheckCircle2,
+    GraduationCap,
+    Shield,
+    Sparkles,
+    Users,
+} from "lucide-react";
+
+const roles = [
+    { id: "student", label: "Ученик", icon: GraduationCap, href: "/student", accent: "bg-sky-500/10 text-sky-700" },
+    { id: "teacher", label: "Учитель", icon: BookOpen, href: "/teacher", accent: "bg-emerald-500/10 text-emerald-700" },
+    { id: "parent", label: "Родитель", icon: Users, href: "/parent", accent: "bg-amber-500/15 text-amber-700" },
+    { id: "admin", label: "Администрация", icon: Shield, href: "/admin", accent: "bg-slate-900/10 text-slate-800" },
+];
 
 export default function LoginPage() {
-    const roles = [
-        { id: "student", label: "Ученик", icon: GraduationCap, href: "/student", color: "text-blue-500", bg: "bg-blue-500/10" },
-        { id: "teacher", label: "Учитель", icon: BookOpen, href: "/teacher", color: "text-emerald-500", bg: "bg-emerald-500/10" },
-        { id: "parent", label: "Родитель", icon: Users, href: "/parent", color: "text-amber-500", bg: "bg-amber-500/10" },
-        { id: "admin", label: "Администрация", icon: Shield, href: "/admin", color: "text-violet-500", bg: "bg-violet-500/10" },
-    ];
-
     return (
-        <div className="min-h-screen w-full flex items-center justify-center bg-background relative overflow-hidden p-4">
-            {/* Background Decorative Elements */}
-            <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
-                <div className="absolute top-[-10%] right-[-5%] w-[500px] h-[500px] rounded-full bg-primary/20 blur-[120px]" />
-                <div className="absolute bottom-[-10%] left-[-10%] w-[600px] h-[600px] rounded-full bg-secondary-accent/20 blur-[150px]" />
-            </div>
+        <div className="ambient-page relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-10">
+            <div className="absolute left-[-10%] top-[-12%] h-72 w-72 rounded-full bg-cyan-400/20 blur-3xl" />
+            <div className="absolute bottom-[-12%] right-[-5%] h-80 w-80 rounded-full bg-amber-300/18 blur-3xl" />
 
-            <div className="liquid-glass-strong rounded-3xl w-full max-w-[1000px] min-h-[600px] flex flex-col md:flex-row shadow-2xl z-10 overflow-hidden">
+            <div className="liquid-glass-strong grid w-full max-w-6xl overflow-hidden rounded-[36px] lg:grid-cols-[0.95fr_1.05fr]">
+                <section className="relative overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-cyan-950 p-8 text-white sm:p-10 lg:p-12">
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.22),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(45,212,191,0.22),transparent_30%)]" />
 
-                {/* Left Side (Branding & Info) */}
-                <div className="w-full md:w-5/12 bg-gradient-to-br from-primary to-[#4f3c88] p-10 flex flex-col justify-between text-white relative overflow-hidden">
-                    <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-overlay"></div>
+                    <div className="relative z-10 flex h-full flex-col justify-between">
+                        <div>
+                            <Link href="/" className="inline-flex items-center gap-3">
+                                <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl bg-white/12 backdrop-blur-xl">
+                                    <Image src={logo} alt="AqbobekHub logo" className="h-full w-full object-cover" priority />
+                                </div>
+                                <div>
+                                    <p className="font-sora text-xl font-bold tracking-tight">AqbobekHub</p>
+                                    <p className="text-xs font-semibold uppercase tracking-[0.28em] text-white/60">Unified School OS</p>
+                                </div>
+                            </Link>
 
-                    <div className="relative z-10">
-                        <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center mb-8 border border-white/30">
-                            <span className="font-sora font-bold text-xl tracking-tight">AH</span>
+                            <div className="mt-10 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-bold uppercase tracking-[0.22em] text-cyan-200">
+                                <Sparkles className="h-4 w-4" />
+                                Demo Access
+                            </div>
+
+                            <h1 className="mt-6 max-w-xl text-balance font-sora text-4xl font-bold leading-[1.02] tracking-tight sm:text-5xl">
+                                Вход в школу, которая выглядит уверенно и работает как единая система.
+                            </h1>
+                            <p className="mt-6 max-w-lg text-base leading-8 text-white/70">
+                                Обновленный вход отражает весь характер продукта: спокойная визуальная система, четкий выбор роли и быстрый доступ к основным сценариям платформы.
+                            </p>
                         </div>
-                        <h1 className="font-sora text-4xl sm:text-5xl font-bold leading-[1.1] mb-6 shadow-sm">
-                            Добро пожаловать в AqbobekHub
-                        </h1>
-                        <p className="text-white/80 text-lg leading-relaxed max-w-sm font-medium">
-                            Единая экосистема для вашей школы. Выберите свою роль для входа в портал.
-                        </p>
-                    </div>
 
-                    <div className="relative z-10 mt-12 md:mt-0">
-                        <div className="flex -space-x-3 mb-4">
-                            {[1, 2, 3, 4].map((i) => (
-                                <div key={i} className="w-10 h-10 rounded-full border-2 border-[#5b469e] bg-white/10 backdrop-blur-sm flex items-center justify-center text-xs font-bold shrink-0">
-                                    {i}
+                        <div className="mt-10 space-y-4">
+                            {[
+                                "Четкое разделение ролей без лишних кликов",
+                                "Единая визуальная логика между лендингом и кабинетом",
+                                "Демо-вход готов для презентаций и питчинга",
+                            ].map((item) => (
+                                <div key={item} className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+                                    <CheckCircle2 className="mt-0.5 h-5 w-5 text-cyan-300" />
+                                    <p className="text-sm leading-7 text-white/80">{item}</p>
                                 </div>
                             ))}
-                            <div className="w-10 h-10 rounded-full border-2 border-[#5b469e] bg-white/20 backdrop-blur-sm flex items-center justify-center text-xs font-bold pl-1">+</div>
                         </div>
-                        <p className="text-sm font-medium text-white/70">Более 2000 пользователей уже с нами</p>
                     </div>
-                </div>
+                </section>
 
-                {/* Right Side (Auth Forms / Quick Login) */}
-                <div className="w-full md:w-7/12 p-8 md:p-12 flex flex-col justify-center bg-card/80 backdrop-blur-xl">
-                    <div className="max-w-md w-full mx-auto">
-                        <h2 className="font-sora text-2xl font-bold text-foreground mb-2">Вход в систему</h2>
-                        <p className="text-muted-foreground mb-8">Используйте демо-доступ для быстрого входа в MVP платформы.</p>
+                <section className="bg-white/80 p-8 sm:p-10 lg:p-12">
+                    <div className="mx-auto max-w-xl">
+                        <p className="text-sm font-bold uppercase tracking-[0.25em] text-primary">Вход в систему</p>
+                        <h2 className="mt-4 font-sora text-3xl font-bold tracking-tight text-foreground">
+                            Выберите быстрый путь в демо-платформу
+                        </h2>
+                        <p className="mt-4 text-base leading-7 text-muted-foreground">
+                            Ниже сохранен демо-сценарий для MVP. Можно войти от лица ученика, учителя, родителя или администрации и сразу оценить обновленный интерфейс.
+                        </p>
 
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-foreground mb-1.5">Email</label>
-                                <input
-                                    type="email"
-                                    placeholder="demo@aqbobek.kz"
-                                    className="w-full px-4 py-3 rounded-xl border border-border bg-white/50 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all font-medium"
-                                    disabled
-                                />
+                        <div className="mt-8 rounded-[28px] border border-slate-200 bg-slate-50/90 p-5">
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <div>
+                                    <label className="mb-2 block text-sm font-semibold text-foreground">Email</label>
+                                    <input
+                                        type="email"
+                                        placeholder="demo@aqbobek.kz"
+                                        disabled
+                                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-muted-foreground outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="mb-2 block text-sm font-semibold text-foreground">Пароль</label>
+                                    <input
+                                        type="password"
+                                        placeholder="••••••••"
+                                        disabled
+                                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-muted-foreground outline-none"
+                                    />
+                                </div>
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-foreground mb-1.5">Пароль</label>
-                                <input
-                                    type="password"
-                                    placeholder="••••••••"
-                                    className="w-full px-4 py-3 rounded-xl border border-border bg-white/50 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all font-medium"
-                                    disabled
-                                />
-                            </div>
-                            <button className="w-full bg-primary text-white rounded-xl py-3.5 font-semibold shadow-[0_4px_16px_rgba(157,118,220,0.4)] hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 mt-2 opacity-50 cursor-not-allowed">
-                                Войти по Email <ArrowRight className="w-4 h-4" />
-                            </button>
+
+                            <Link href="/student" className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 py-3.5 text-sm font-semibold text-white hover:bg-slate-800">
+                                Быстрый demo-вход
+                                <ArrowRight className="h-4 w-4" />
+                            </Link>
                         </div>
 
-                        <div className="relative my-8">
-                            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border"></div></div>
-                            <div className="relative flex justify-center text-sm"><span className="px-4 bg-transparent text-muted-foreground font-medium">ИЛИ БЫСТРЫЙ ВХОД (DEMO)</span></div>
+                        <div className="my-8 flex items-center gap-3">
+                            <div className="h-px flex-1 bg-slate-200" />
+                            <span className="text-xs font-bold uppercase tracking-[0.28em] text-muted-foreground">Быстрый вход</span>
+                            <div className="h-px flex-1 bg-slate-200" />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid gap-4 sm:grid-cols-2">
                             {roles.map((role) => {
                                 const Icon = role.icon;
+
                                 return (
                                     <Link
                                         key={role.id}
                                         href={role.href}
-                                        className="flex flex-col items-center justify-center p-4 rounded-xl border border-border bg-white hover:border-primary/50 hover:shadow-lg transition-all group"
+                                        className="group rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_16px_40px_rgba(15,23,42,0.06)] hover:-translate-y-1 hover:border-cyan-200 hover:shadow-[0_22px_50px_rgba(15,23,42,0.10)]"
                                     >
-                                        <div className={`w-12 h-12 rounded-full ${role.bg} ${role.color} flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
-                                            <Icon className="w-6 h-6" />
+                                        <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${role.accent}`}>
+                                            <Icon className="h-5 w-5" />
                                         </div>
-                                        <span className="font-semibold text-foreground">{role.label}</span>
+                                        <h3 className="mt-5 text-lg font-bold text-foreground">{role.label}</h3>
+                                        <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                                            Открыть персонализированный сценарий и посмотреть демо-интерфейс роли.
+                                        </p>
+                                        <div className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-primary">
+                                            Войти как {role.label.toLowerCase()}
+                                            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                                        </div>
                                     </Link>
-                                )
+                                );
                             })}
                         </div>
-
                     </div>
-                </div>
-
+                </section>
             </div>
         </div>
     );

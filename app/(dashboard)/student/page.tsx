@@ -1,19 +1,41 @@
 "use client";
 
-import React from "react";
+import Link from "next/link";
+import React, { useState } from "react";
 import {
     TrendingUp, TrendingDown, BookOpen, AlertTriangle,
-    Target, GraduationCap, Award, Calendar, Lightbulb, ChevronRight, Activity, Sparkles
+    Target, GraduationCap, Award, Calendar, Lightbulb, ChevronRight, Activity, Sparkles, CheckCircle2
 } from "lucide-react";
 
+const subjects = [
+    { name: "Алгебра", grade: "98%", trend: "up", progress: 98, color: "bg-green-500" },
+    { name: "Геометрия", grade: "92%", trend: "up", progress: 92, color: "bg-blue-500" },
+    { name: "Физика", grade: "74%", trend: "down", progress: 74, color: "bg-orange-500" },
+    { name: "История Казахстана", grade: "88%", trend: "up", progress: 88, color: "bg-primary" },
+];
+
+const lessons = [
+    { time: "08:30 - 09:15", title: "Алгебра", room: "Каб. 302" },
+    { time: "09:25 - 10:10", title: "Физика (СОР)", room: "Каб. 210", highlight: true },
+    { time: "10:30 - 11:15", title: "Английский язык", room: "Каб. 105" },
+    { time: "11:25 - 12:10", title: "Биология", room: "Каб. 401" },
+];
+
 export default function StudentDashboard() {
+    const [message, setMessage] = useState("Нажми на действие, и я покажу результат прямо в интерфейсе.");
+    const [completedTasks, setCompletedTasks] = useState(0);
+
+    const markAction = (text: string, delta = 0) => {
+        setMessage(text);
+        setCompletedTasks((current) => current + delta);
+    };
+
     return (
         <div className="space-y-6 animate-fadeUp">
-            {/* Header Section */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
                 <div>
                     <h1 className="text-3xl font-sora font-bold text-foreground">Привет, Тимур! 👋</h1>
-                    <p className="text-muted-foreground mt-1 text-sm font-medium">Твоя успеваемость за 3 четверть, 10 \"А\" класс</p>
+                    <p className="text-muted-foreground mt-1 text-sm font-medium">Твоя успеваемость за 3 четверть, 10 "А" класс</p>
                 </div>
                 <div className="liquid-glass px-4 py-2 flex items-center gap-3 rounded-2xl">
                     <div className="w-10 h-10 rounded-full bg-gradient-to-r from-amber-400 to-amber-600 flex items-center justify-center text-white shadow-sm">
@@ -26,7 +48,14 @@ export default function StudentDashboard() {
                 </div>
             </div>
 
-            {/* Top Stats Grid */}
+            <div className="liquid-glass rounded-3xl px-5 py-4 flex items-start gap-3">
+                <CheckCircle2 className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                <div>
+                    <p className="text-sm font-semibold text-foreground">{message}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Завершено действий в этой сессии: {completedTasks}</p>
+                </div>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="liquid-glass p-5 rounded-3xl flex flex-col justify-between">
                     <div className="flex items-center justify-between mb-4">
@@ -56,7 +85,7 @@ export default function StudentDashboard() {
 
                 <div className="liquid-glass p-5 rounded-3xl flex flex-col justify-between">
                     <div className="flex items-center justify-between mb-4">
-                        <div className="w-10 h-10 rounded-xl bg-highlight/20 flex items-center justify-center text-coral-600 text-highlight">
+                        <div className="w-10 h-10 rounded-xl bg-highlight/20 flex items-center justify-center text-highlight">
                             <Target className="w-5 h-5" />
                         </div>
                     </div>
@@ -67,11 +96,7 @@ export default function StudentDashboard() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-                {/* Left Col (Analytics & AI) */}
                 <div className="lg:col-span-2 space-y-6">
-
-                    {/* AI Predictive Analytics Panel */}
                     <div className="bg-gradient-to-br from-[#f8f5ff] to-white border border-primary/20 p-6 rounded-[2rem] shadow-sm relative overflow-hidden">
                         <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
                             <Activity className="w-48 h-48 text-primary" />
@@ -82,7 +107,6 @@ export default function StudentDashboard() {
                         </div>
 
                         <div className="space-y-4 relative z-10">
-                            {/* Critical AI Insight */}
                             <div className="bg-white/60 backdrop-blur-md border border-orange-200 rounded-2xl p-4 flex gap-4 items-start">
                                 <div className="mt-1 w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 shrink-0">
                                     <AlertTriangle className="w-4 h-4" />
@@ -93,17 +117,22 @@ export default function StudentDashboard() {
                                         С вероятностью <span className="font-bold text-orange-600">82%</span> ты можешь написать следующий СОЧ ниже своей нормы из-за недавних пробелов в теме <span className="font-semibold text-foreground">«Электрическое поле»</span>.
                                     </p>
                                     <div className="flex flex-wrap gap-2">
-                                        <button className="text-xs font-semibold bg-primary text-white px-3 py-1.5 rounded-lg hover:bg-primary/90 transition-colors">
+                                        <button
+                                            onClick={() => markAction("Видеоурок добавлен в твой план на вечер. Напоминание придет за 20 минут до начала.", 1)}
+                                            className="text-xs font-semibold bg-primary text-white px-3 py-1.5 rounded-lg hover:bg-primary/90"
+                                        >
                                             Смотреть видеоурок (12 мин)
                                         </button>
-                                        <button className="text-xs font-semibold bg-white border border-border text-foreground px-3 py-1.5 rounded-lg hover:bg-black/5 transition-colors">
+                                        <button
+                                            onClick={() => markAction("2 адаптивные задачи открыты. После решения обновится прогноз по физике.", 1)}
+                                            className="text-xs font-semibold bg-white border border-border text-foreground px-3 py-1.5 rounded-lg hover:bg-black/5"
+                                        >
                                             Пройти 2 задачи
                                         </button>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Positive AI Insight */}
                             <div className="bg-white/60 backdrop-blur-md border border-green-200 rounded-2xl p-4 flex gap-4 items-start">
                                 <div className="mt-1 w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-600 shrink-0">
                                     <Lightbulb className="w-4 h-4" />
@@ -118,17 +147,15 @@ export default function StudentDashboard() {
                         </div>
                     </div>
 
-                    {/* Subjects Progress */}
                     <div className="liquid-glass p-6 rounded-[2rem]">
                         <h2 className="text-lg font-sora font-bold text-foreground mb-5">Успеваемость по предметам</h2>
                         <div className="space-y-4">
-                            {[
-                                { name: "Алгебра", grade: "98%", trend: "up", progress: 98, color: "bg-green-500" },
-                                { name: "Геометрия", grade: "92%", trend: "up", progress: 92, color: "bg-blue-500" },
-                                { name: "Физика", grade: "74%", trend: "down", progress: 74, color: "bg-orange-500" },
-                                { name: "История Казахстана", grade: "88%", trend: "up", progress: 88, color: "bg-primary" }
-                            ].map((subject) => (
-                                <div key={subject.name} className="flex items-center gap-4">
+                            {subjects.map((subject) => (
+                                <button
+                                    key={subject.name}
+                                    onClick={() => markAction(`Открыт подробный прогресс по предмету «${subject.name}».`, 0)}
+                                    className="flex w-full items-center gap-4 text-left"
+                                >
                                     <div className="w-1/4">
                                         <p className="text-sm font-semibold text-foreground">{subject.name}</p>
                                     </div>
@@ -145,17 +172,13 @@ export default function StudentDashboard() {
                                             <TrendingDown className="w-3 h-3 text-red-500" />
                                         )}
                                     </div>
-                                </div>
+                                </button>
                             ))}
                         </div>
                     </div>
-
                 </div>
 
-                {/* Right Col (Events, Schedule snippet) */}
                 <div className="space-y-6">
-
-                    {/* Upcoming Schedule */}
                     <div className="liquid-glass p-6 rounded-[2rem]">
                         <div className="flex items-center justify-between mb-5">
                             <h2 className="text-lg font-sora font-bold text-foreground">Завтра, 14 Марта</h2>
@@ -163,42 +186,39 @@ export default function StudentDashboard() {
                         </div>
 
                         <div className="relative border-l-2 border-border ml-2 pl-4 space-y-6">
-                            {[
-                                { time: "08:30 - 09:15", title: "Алгебра", room: "Каб. 302" },
-                                { time: "09:25 - 10:10", title: "Физика (СОР)", room: "Каб. 210", highlight: true },
-                                { time: "10:30 - 11:15", title: "Английский язык", room: "Каб. 105" },
-                                { time: "11:25 - 12:10", title: "Биология", room: "Каб. 401" }
-                            ].map((lesson, i) => (
-                                <div key={i} className="relative">
-                                    <div className={`absolute -left-[21px] top-1.5 w-2.5 h-2.5 rounded-full ${lesson.highlight ? 'bg-orange-500 ring-4 ring-orange-500/20' : 'bg-border'}`}></div>
+                            {lessons.map((lesson, i) => (
+                                <button
+                                    key={i}
+                                    onClick={() => markAction(`Открыт урок «${lesson.title}». Кабинет: ${lesson.room}.`, 0)}
+                                    className="relative block w-full text-left"
+                                >
+                                    <div className={`absolute -left-[21px] top-1.5 w-2.5 h-2.5 rounded-full ${lesson.highlight ? "bg-orange-500 ring-4 ring-orange-500/20" : "bg-border"}`}></div>
                                     <p className="text-xs font-bold text-muted-foreground mb-1">{lesson.time}</p>
-                                    <div className={`p-3 rounded-xl ${lesson.highlight ? 'bg-orange-50 border border-orange-100' : 'bg-black/5'} flex justify-between items-center`}>
-                                        <p className={`text-sm font-semibold ${lesson.highlight ? 'text-orange-900' : 'text-foreground'}`}>{lesson.title}</p>
-                                        <p className={`text-xs font-medium ${lesson.highlight ? 'text-orange-700' : 'text-muted-foreground'}`}>{lesson.room}</p>
+                                    <div className={`p-3 rounded-xl ${lesson.highlight ? "bg-orange-50 border border-orange-100" : "bg-black/5"} flex justify-between items-center`}>
+                                        <p className={`text-sm font-semibold ${lesson.highlight ? "text-orange-900" : "text-foreground"}`}>{lesson.title}</p>
+                                        <p className={`text-xs font-medium ${lesson.highlight ? "text-orange-700" : "text-muted-foreground"}`}>{lesson.room}</p>
                                     </div>
-                                </div>
+                                </button>
                             ))}
                         </div>
-                        <button className="w-full mt-6 text-sm font-semibold text-primary flex items-center justify-center gap-1 hover:text-primary/80 transition-colors">
+                        <Link href="/admin/schedule" className="w-full mt-6 text-sm font-semibold text-primary flex items-center justify-center gap-1 hover:text-primary/80 transition-colors">
                             Полное расписание <ChevronRight className="w-4 h-4" />
-                        </button>
+                        </Link>
                     </div>
 
-                    {/* School Events */}
                     <div className="liquid-glass p-6 rounded-[2rem]">
                         <h2 className="text-lg font-sora font-bold text-foreground mb-4">Школьные события</h2>
                         <div className="space-y-3">
-                            <div className="p-3 bg-white/50 backdrop-blur-sm rounded-xl border border-border/50 hover:border-primary/30 transition-colors cursor-pointer">
+                            <Link href="/news" className="block p-3 bg-white/50 backdrop-blur-sm rounded-xl border border-border/50 hover:border-primary/30 transition-colors">
                                 <p className="text-xs font-bold text-primary mb-1">15 Марта</p>
                                 <p className="text-sm font-semibold text-foreground">Городская олимпиада по математике</p>
-                            </div>
-                            <div className="p-3 bg-white/50 backdrop-blur-sm rounded-xl border border-border/50 hover:border-primary/30 transition-colors cursor-pointer">
+                            </Link>
+                            <Link href="/news" className="block p-3 bg-white/50 backdrop-blur-sm rounded-xl border border-border/50 hover:border-primary/30 transition-colors">
                                 <p className="text-xs font-bold text-secondary-accent mb-1">18 Марта</p>
                                 <p className="text-sm font-semibold text-foreground">Открытый урок по робототехнике</p>
-                            </div>
+                            </Link>
                         </div>
                     </div>
-
                 </div>
             </div>
         </div>

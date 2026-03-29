@@ -1,8 +1,10 @@
 "use client";
 
+import Image from "next/image";
 import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import logo from "../logo.png";
 import {
     Menu, X, Home, Users, BookOpen, Calendar,
     Settings, Bell, LogOut, Award, Sparkles, Newspaper, Monitor, Shield
@@ -31,8 +33,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             <aside className="hidden md:flex flex-col w-64 h-full border-r border-border bg-card/50 backdrop-blur-xl">
                 <div className="p-6">
                     <Link href="/" className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary to-secondary-accent flex items-center justify-center text-white font-sora font-bold text-sm">
-                            AH
+                        <div className="w-10 h-10 rounded-xl overflow-hidden bg-white shadow-sm">
+                            <Image src={logo} alt="AqbobekHub logo" className="h-full w-full object-cover" />
                         </div>
                         <span className="font-sora font-bold text-lg text-foreground tracking-tight">AqbobekHub</span>
                     </Link>
@@ -72,7 +74,12 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="p-4 flex justify-between items-center border-b border-border">
-                            <span className="font-sora font-bold text-lg">AqbobekHub</span>
+                            <Link href="/" className="flex items-center gap-3">
+                                <div className="w-9 h-9 rounded-xl overflow-hidden bg-white shadow-sm">
+                                    <Image src={logo} alt="AqbobekHub logo" className="h-full w-full object-cover" />
+                                </div>
+                                <span className="font-sora font-bold text-lg">AqbobekHub</span>
+                            </Link>
                             <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 text-muted-foreground"><X className="w-5 h-5" /></button>
                         </div>
                         <nav className="flex-1 px-4 py-4 overflow-y-auto space-y-1">
