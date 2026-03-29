@@ -9,8 +9,6 @@ type ChatMessage = {
     text: string;
 };
 
-const STORAGE_KEY = "aqbobekhub_gemini_chat";
-
 const quickPrompts = [
     "Сводка по физике",
     "Что повторить перед завтрашним днем?",
@@ -75,16 +73,6 @@ function renderFormattedText(text: string) {
             continue;
         }
 
-        if (/^день\s+\d+/i.test(currentLine) || /план/i.test(currentLine) && currentLine.length < 80) {
-            elements.push(
-                <p key={`title-${index}`} className="font-semibold text-foreground">
-                    {currentLine}
-                </p>,
-            );
-            index += 1;
-            continue;
-        }
-
         const paragraphLines: string[] = [];
         while (
             index < lines.length &&
@@ -111,29 +99,22 @@ export default function AIAssistant() {
     const [input, setInput] = useState("");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
-    const [hydrated, setHydrated] = useState(false);
     const chatEndRef = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
-        try {
-            const saved = window.localStorage.getItem(STORAGE_KEY);
-            if (saved) {
-                const parsed = JSON.parse(saved) as ChatMessage[];
-                if (Array.isArray(parsed) && parsed.length > 0) {
-                    setMessages(parsed);
-                }
+        const load = async () => {
+            try {
+                const response = await fetch("/api/ai-assistant/history");
+                const data = await response.json();
+                if (!response.ok) throw new Error(data?.error || "Не удалось загрузить историю чата.");
+                setMessages(data.messages.length > 0 ? data.messages : [initialMessage]);
+            } catch (requestError) {
+                setError(requestError instanceof Error ? requestError.message : "Не удалось загрузить историю чата.");
             }
-        } catch {
-            // Ignore malformed local storage state and keep the default welcome message.
-        } finally {
-            setHydrated(true);
-        }
-    }, []);
+        };
 
-    useEffect(() => {
-        if (!hydrated) return;
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
-    }, [messages, hydrated]);
+        void load();
+    }, []);
 
     useEffect(() => {
         chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -148,8 +129,8 @@ export default function AIAssistant() {
         const message = text.trim();
         if (!message || loading) return;
 
-        const nextMessages: ChatMessage[] = [...messages, { id: crypto.randomUUID(), role: "user", text: message }];
-        setMessages(nextMessages);
+        const optimisticMessage: ChatMessage = { id: crypto.randomUUID(), role: "user", text: message };
+        setMessages((current) => [...current, optimisticMessage]);
         setInput("");
         setLoading(true);
         setError("");
@@ -160,19 +141,15 @@ export default function AIAssistant() {
                 headers: {
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify({
-                    message,
-                    history: messages,
-                }),
+                body: JSON.stringify({ message }),
             });
 
             const data = await response.json();
-
             if (!response.ok) {
-                throw new Error(data?.error || "Не удалось получить ответ от Gemini.");
+                throw new Error(data?.error || "Не удалось получить ответ от AI-Наставника.");
             }
 
-            setMessages((current) => [...current, { id: crypto.randomUUID(), role: "assistant", text: normalizeText(data.text) }]);
+            setMessages((current) => [...current, { id: data.messageId ?? crypto.randomUUID(), role: "assistant", text: normalizeText(data.text) }]);
         } catch (requestError) {
             const messageText = requestError instanceof Error ? requestError.message : "Ошибка при обращении к AI-Наставнику.";
             setError(messageText);
@@ -189,6 +166,20 @@ export default function AIAssistant() {
         }
     };
 
+    const clearHistory = async () => {
+        try {
+            const response = await fetch("/api/ai-assistant/history", {
+                method: "DELETE",
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data?.error || "Не удалось очистить историю.");
+            setMessages([initialMessage]);
+            setError("");
+        } catch (requestError) {
+            setError(requestError instanceof Error ? requestError.message : "Не удалось очистить историю.");
+        }
+    };
+
     return (
         <div className="space-y-6 animate-fadeUp h-full flex flex-col">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 shadow-sm pb-4 border-b border-border">
@@ -196,7 +187,7 @@ export default function AIAssistant() {
                     <h1 className="text-3xl font-sora font-bold text-foreground flex items-center gap-3">
                         <Sparkles className="w-8 h-8 text-primary" /> AI-Наставник
                     </h1>
-                    <p className="text-muted-foreground mt-2 text-sm font-medium">Реальный чат на Gemini API для учебной поддержки и рекомендаций</p>
+                    <p className="text-muted-foreground mt-2 text-sm font-medium">Gemini с контекстом из реальных оценок, расписания, рисков и задач</p>
                 </div>
             </div>
 
@@ -219,11 +210,11 @@ export default function AIAssistant() {
                                 Попросите наставника составить мини-план повторения, разобрать ошибки или объяснить сложную тему простыми словами.
                             </p>
                             <div className="flex flex-col gap-2">
-                                <button onClick={() => sendMessage("Сделай мне краткий план подготовки к СОЧ по физике на сегодня")} className="text-xs text-left bg-white border border-border p-3 rounded-xl shadow-sm hover:border-primary transition-colors flex items-center justify-between group-hover:bg-primary/5">
+                                <button onClick={() => void sendMessage("Сделай мне краткий план подготовки к СОЧ по физике на сегодня")} className="text-xs text-left bg-white border border-border p-3 rounded-xl shadow-sm hover:border-primary transition-colors flex items-center justify-between group-hover:bg-primary/5">
                                     <span className="font-semibold text-foreground">План на сегодня</span>
                                     <PlayCircle className="w-4 h-4 text-primary" />
                                 </button>
-                                <button onClick={() => sendMessage("Объясни тему электрического поля простыми словами для ученика 10 класса")} className="text-xs text-left bg-white border border-border p-3 rounded-xl shadow-sm hover:border-primary transition-colors flex items-center justify-between group-hover:bg-primary/5">
+                                <button onClick={() => void sendMessage("Объясни тему электрического поля простыми словами для ученика 10 класса")} className="text-xs text-left bg-white border border-border p-3 rounded-xl shadow-sm hover:border-primary transition-colors flex items-center justify-between group-hover:bg-primary/5">
                                     <span className="font-semibold text-foreground">Объяснить тему</span>
                                     <FileText className="w-4 h-4 text-primary" />
                                 </button>
@@ -241,7 +232,7 @@ export default function AIAssistant() {
                             <p className="text-sm font-medium text-muted-foreground leading-relaxed mb-4">
                                 Используйте чат для учебного плана, мотивации, расписания повторения и персональных рекомендаций.
                             </p>
-                            <button onClick={() => sendMessage("Составь мне учебный план на 7 дней, чтобы подтянуть алгебру и физику")} className="text-xs text-left bg-white border border-border p-3 rounded-xl shadow-sm hover:border-primary transition-colors flex items-center justify-between w-full mt-auto">
+                            <button onClick={() => void sendMessage("Составь мне учебный план на 7 дней, чтобы подтянуть алгебру и физику")} className="text-xs text-left bg-white border border-border p-3 rounded-xl shadow-sm hover:border-primary transition-colors flex items-center justify-between w-full mt-auto">
                                 <span className="font-semibold text-foreground">План на 7 дней</span>
                                 <ArrowRight className="w-4 h-4 text-primary" />
                             </button>
@@ -259,11 +250,7 @@ export default function AIAssistant() {
                                 <p className="mt-1 text-xs font-medium text-muted-foreground">{messageCountLabel}</p>
                             </div>
                             <button
-                                onClick={() => {
-                                    setMessages([initialMessage]);
-                                    setError("");
-                                    window.localStorage.setItem(STORAGE_KEY, JSON.stringify([initialMessage]));
-                                }}
+                                onClick={() => void clearHistory()}
                                 className="inline-flex items-center gap-2 rounded-xl border border-border bg-white px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground"
                             >
                                 <Trash2 className="w-4 h-4" />
@@ -297,7 +284,7 @@ export default function AIAssistant() {
                             {quickPrompts.map((prompt) => (
                                 <button
                                     key={prompt}
-                                    onClick={() => sendMessage(prompt)}
+                                    onClick={() => void sendMessage(prompt)}
                                     disabled={loading}
                                     className="text-xs bg-white border border-border px-3 py-1.5 rounded-full text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
                                 >
@@ -318,13 +305,12 @@ export default function AIAssistant() {
                                     }
                                 }}
                                 placeholder="Например: как подготовиться к физике за 2 дня?"
-                                className="w-full bg-white border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 pe-10"
-                                disabled={loading}
+                                className="w-full rounded-2xl border border-border bg-white px-4 py-3 pr-14 text-sm font-medium text-foreground outline-none"
                             />
                             <button
                                 onClick={() => void sendMessage(input)}
-                                disabled={loading}
-                                className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg bg-primary text-white flex items-center justify-center hover:bg-primary/90 disabled:opacity-50"
+                                disabled={loading || !input.trim()}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-xl bg-primary px-3 py-2 text-white disabled:opacity-50"
                             >
                                 <ArrowRight className="w-4 h-4" />
                             </button>

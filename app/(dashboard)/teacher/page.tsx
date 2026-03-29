@@ -3,67 +3,102 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
     Users, AlertOctagon, TrendingDown, CheckSquare,
-    FileText, ArrowUpRight, Sparkles, UserX, Activity, CheckCircle2, BellRing
+    FileText, ArrowUpRight, Sparkles, UserX, Activity, CheckCircle2, BellRing,
 } from "lucide-react";
-import { readBroadcasts, subscribeAdminSync, type DemoBroadcast } from "../../../lib/demo-admin-store";
 
-const initialStudents = [
-    { name: "Алихан Смаилов", class: "10 Б", drop: "-15%", reason: "Пропустил 3 урока, не сдал ЛР #4", risk: "Высокий" },
-    { name: "Амина Серикова", class: "10 А", drop: "-8%", reason: "Систематические ошибки в задачах на закон Фарадея", risk: "Средний" },
-    { name: "Руслан Ким", class: "10 Б", drop: "-12%", reason: "Резкое падение активности на уроке", risk: "Высокий" },
-];
+type TeacherDashboardPayload = {
+    teacher: {
+        fullName: string;
+        subtitle: string;
+    };
+    adminMessages: Array<{ id: string; audience: string; text: string }>;
+    stats: {
+        totalStudents: number;
+        avgGrade: number;
+        riskCount: number;
+        absences: number;
+    };
+    aiSummary: string;
+    students: Array<{ id: string; name: string; class: string; drop: string; reason: string; risk: string }>;
+    tasks: Array<{ id: string; title: string; note: string | null; done: boolean; urgent: boolean }>;
+};
 
 export default function TeacherDashboard() {
-    const [students, setStudents] = useState(initialStudents);
-    const [status, setStatus] = useState("Готово к работе: можно сформировать отчет, назначить тест и отправить уведомления.");
-    const [tasks, setTasks] = useState([
-        { title: 'Проверить СОЧ 10 "А"', note: "Остался 1 день до закрытия оценок", done: false, urgent: true },
-        { title: "Загрузить конспект лекции", note: "Тема: Электромагнитная индукция", done: false },
-        { title: "Заполнить Кунделик", note: "За 14 Марта", done: false },
-    ]);
-    const [adminMessages, setAdminMessages] = useState<DemoBroadcast[]>([]);
+    const [dashboard, setDashboard] = useState<TeacherDashboardPayload | null>(null);
+    const [status, setStatus] = useState("Загружаем кабинет учителя и аналитику классов.");
+    const [loading, setLoading] = useState(true);
+
+    const load = async () => {
+        try {
+            const response = await fetch("/api/teacher/dashboard");
+            const data = await response.json();
+            if (!response.ok) throw new Error(data?.error || "Не удалось загрузить кабинет учителя.");
+            setDashboard(data.dashboard);
+            setStatus("Данные учителя синхронизированы с базой. Журнал и риски обновлены.");
+        } catch (error) {
+            setStatus(error instanceof Error ? error.message : "Не удалось загрузить кабинет учителя.");
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const sync = () => {
-            const messages = readBroadcasts().filter((item) => item.audience === "Учителя" || item.audience === "Все пользователи");
-            setAdminMessages(messages);
-        };
-        sync();
-        return subscribeAdminSync(sync);
+        void load();
     }, []);
 
-    const riskCount = useMemo(() => students.filter((student) => student.risk === "Высокий").length, [students]);
+    const riskCount = useMemo(() => dashboard?.students.filter((student) => student.risk === "Высокий").length ?? 0, [dashboard]);
 
-    const toggleTask = (index: number) => {
-        setTasks((current) =>
-            current.map((task, i) => i === index ? { ...task, done: !task.done } : task),
-        );
+    const runAction = async (url: string, options?: RequestInit) => {
+        const response = await fetch(url, options);
+        const data = await response.json();
+        if (!response.ok) throw new Error(data?.error || "Не удалось выполнить действие.");
+        if (data?.message) setStatus(data.message);
+        await load();
+        return data;
     };
 
-    const report = () => {
-        setStatus("Отчет сформирован: 10 А стабилен, 10 Б требует короткого диагностического теста и разбора домашней работы.");
+    const toggleTask = async (id: string, done: boolean) => {
+        try {
+            await runAction(`/api/teacher/tasks/${id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ done: !done }),
+            });
+        } catch (error) {
+            setStatus(error instanceof Error ? error.message : "Не удалось обновить задачу.");
+        }
     };
 
-    const notifyParents = () => {
-        setStatus('Черновик уведомления для родителей 10 "Б" подготовлен и сохранен в журнале коммуникаций.');
+    const report = async () => {
+        try {
+            await runAction("/api/teacher/reports", { method: "POST" });
+        } catch (error) {
+            setStatus(error instanceof Error ? error.message : "Не удалось сформировать отчет.");
+        }
     };
 
-    const generateTest = () => {
-        setStatus("Диагностический тест на 10 минут создан. Его можно выдать на следующий урок.");
+    const communication = async (action: string, fallback: string) => {
+        try {
+            await runAction("/api/teacher/communications", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action }),
+            });
+        } catch (error) {
+            setStatus(error instanceof Error ? error.message : fallback);
+        }
     };
 
-    const reviewStudent = (name: string) => {
-        setStatus(`Открыта карточка ученика: ${name}. Приоритет - персональная работа на следующем уроке.`);
-    };
+    const dashboardData = dashboard;
 
     return (
         <div className="space-y-6 animate-fadeUp">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
                 <div>
                     <h1 className="text-3xl font-sora font-bold text-foreground">Кабинет учителя</h1>
-                    <p className="text-muted-foreground mt-1 text-sm font-medium">Физика, 10 "А" и 10 "Б" классы</p>
+                    <p className="text-muted-foreground mt-1 text-sm font-medium">{dashboardData?.teacher.subtitle ?? "Загружаем назначенные предметы и классы..."}</p>
                 </div>
-                <button onClick={report} className="bg-primary hover:bg-primary/90 text-white px-5 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm">
+                <button onClick={() => void report()} className="bg-primary hover:bg-primary/90 text-white px-5 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm">
                     <FileText className="w-4 h-4" />
                     Сгенерировать отчет
                 </button>
@@ -74,17 +109,17 @@ export default function TeacherDashboard() {
                 <p className="text-sm font-semibold text-foreground">{status}</p>
             </div>
 
-            {adminMessages.length > 0 && (
+            {(dashboardData?.adminMessages?.length ?? 0) > 0 && (
                 <div className="liquid-glass rounded-[2rem] p-6">
                     <div className="flex items-center gap-3 mb-4">
                         <BellRing className="w-5 h-5 text-primary" />
                         <h2 className="font-sora text-lg font-bold text-foreground">Сообщения администрации</h2>
                     </div>
                     <div className="space-y-3">
-                        {adminMessages.slice(0, 3).map((message) => (
+                        {dashboardData?.adminMessages.slice(0, 3).map((message) => (
                             <button
                                 key={message.id}
-                                onClick={() => setStatus(`Открыто сообщение администрации: ${message.text}`)}
+                                onClick={() => void communication(`broadcast:${message.id}`, `Открыто сообщение администрации: ${message.text}`)}
                                 className="w-full rounded-2xl border border-border bg-white/60 p-4 text-left hover:border-primary/30"
                             >
                                 <p className="text-sm font-semibold text-foreground">{message.text}</p>
@@ -101,7 +136,7 @@ export default function TeacherDashboard() {
                         <Users className="w-5 h-5" />
                     </div>
                     <h3 className="text-sm text-muted-foreground font-medium mb-1">Всего учеников</h3>
-                    <p className="text-2xl font-sora font-bold text-foreground">58</p>
+                    <p className="text-2xl font-sora font-bold text-foreground">{dashboardData?.stats.totalStudents ?? 0}</p>
                 </div>
 
                 <div className="liquid-glass p-5 rounded-3xl">
@@ -109,7 +144,7 @@ export default function TeacherDashboard() {
                         <CheckSquare className="w-5 h-5" />
                     </div>
                     <h3 className="text-sm text-muted-foreground font-medium mb-1">Средний балл классов</h3>
-                    <p className="text-2xl font-sora font-bold text-foreground">4.2</p>
+                    <p className="text-2xl font-sora font-bold text-foreground">{dashboardData?.stats.avgGrade.toFixed(1) ?? "0.0"}</p>
                 </div>
 
                 <div className="bg-orange-50/50 border border-orange-100 p-5 rounded-3xl flex flex-col justify-between">
@@ -128,7 +163,7 @@ export default function TeacherDashboard() {
                         <UserX className="w-5 h-5" />
                     </div>
                     <h3 className="text-sm text-muted-foreground font-medium mb-1">Пропуски (неделя)</h3>
-                    <p className="text-2xl font-sora font-bold text-foreground">12 чел/часов</p>
+                    <p className="text-2xl font-sora font-bold text-foreground">{dashboardData?.stats.absences ?? 0}<span className="text-sm font-medium"> чел/часов</span></p>
                 </div>
             </div>
 
@@ -143,15 +178,13 @@ export default function TeacherDashboard() {
                             <h2 className="text-lg font-sora font-bold text-foreground">Сводка AI-Аналитика</h2>
                         </div>
                         <div className="relative z-10 bg-white/60 backdrop-blur-md rounded-2xl p-5 border border-white/50">
-                            <p className="text-sm text-foreground/80 leading-relaxed font-medium">
-                                10 "А" демонстрирует отличное усвоение темы «Магнитное поле» (средний балл вырос на 12%). Однако в 10 "Б" замечено резкое падение вовлеченности - 5 учеников не сдали последние 2 домашних задания. Рекомендуется провести короткое тестирование перед следующим уроком и разобрать ошибки на примерах.
-                            </p>
+                            <p className="text-sm text-foreground/80 leading-relaxed font-medium">{dashboardData?.aiSummary ?? "Готовим аналитику..."}</p>
                             <div className="mt-4 flex gap-3">
-                                <button onClick={generateTest} className="text-xs font-semibold bg-primary text-white px-4 py-2 rounded-xl hover:bg-primary/90">
+                                <button onClick={() => void communication("generate-test", "Не удалось создать тест.")} className="text-xs font-semibold bg-primary text-white px-4 py-2 rounded-xl hover:bg-primary/90">
                                     Сгенерировать тест (10 мин)
                                 </button>
-                                <button onClick={notifyParents} className="text-xs font-semibold bg-white border border-border text-foreground px-4 py-2 rounded-xl hover:bg-black/5">
-                                    Уведомить родителей 10 "Б"
+                                <button onClick={() => void communication("notify-parents", "Не удалось подготовить уведомление.")} className="text-xs font-semibold bg-white border border-border text-foreground px-4 py-2 rounded-xl hover:bg-black/5">
+                                    Уведомить родителей 10 &quot;Б&quot;
                                 </button>
                             </div>
                         </div>
@@ -162,8 +195,8 @@ export default function TeacherDashboard() {
                         <p className="text-sm text-muted-foreground mb-5">Студенты с высоким риском неуспеваемости по прогнозам ИИ</p>
 
                         <div className="space-y-4">
-                            {students.map((student, i) => (
-                                <div key={i} className="bg-white/40 border border-border/60 p-4 rounded-2xl flex items-center justify-between hover:border-orange-300 transition-colors">
+                            {dashboardData?.students.map((student) => (
+                                <div key={student.id} className="bg-white/40 border border-border/60 p-4 rounded-2xl flex items-center justify-between hover:border-orange-300 transition-colors">
                                     <div className="flex items-start gap-4">
                                         <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 font-bold text-sm shrink-0">
                                             {student.name[0]}
@@ -183,10 +216,11 @@ export default function TeacherDashboard() {
                                         <span className="flex items-center gap-1 text-sm font-bold text-red-600">
                                             <TrendingDown className="w-4 h-4" /> {student.drop}
                                         </span>
-                                        <button onClick={() => reviewStudent(student.name)} className="text-xs font-semibold text-primary hover:underline">Подробнее</button>
+                                        <button onClick={() => void communication(`review-student:${student.name}`, `Открыта карточка ученика: ${student.name}.`)} className="text-xs font-semibold text-primary hover:underline">Подробнее</button>
                                     </div>
                                 </div>
                             ))}
+                            {!loading && (dashboardData?.students.length ?? 0) === 0 && <p className="text-sm text-muted-foreground">Нет активных учеников в зоне риска.</p>}
                         </div>
                     </div>
                 </div>
@@ -195,13 +229,10 @@ export default function TeacherDashboard() {
                     <div className="liquid-glass p-6 rounded-[2rem]">
                         <h2 className="text-lg font-sora font-bold text-foreground mb-4">Журнал и Задачи</h2>
                         <ul className="space-y-3">
-                            {tasks.map((task, index) => (
+                            {dashboardData?.tasks.map((task) => (
                                 <li
-                                    key={task.title}
-                                    onClick={() => {
-                                        toggleTask(index);
-                                        setStatus(task.done ? `Задача возвращена в работу: ${task.title}.` : `Задача отмечена как выполненная: ${task.title}.`);
-                                    }}
+                                    key={task.id}
+                                    onClick={() => void toggleTask(task.id, task.done)}
                                     className={`p-3 rounded-xl cursor-pointer transition-colors flex items-center justify-between gap-3 ${task.urgent ? "bg-red-50 border border-red-100 hover:bg-red-100/50" : "bg-white/50 border border-border/50 hover:border-primary/30"} ${task.done ? "opacity-60" : ""}`}
                                 >
                                     <div>
@@ -211,6 +242,7 @@ export default function TeacherDashboard() {
                                     {task.done ? <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" /> : <ArrowUpRight className="w-4 h-4 text-muted-foreground shrink-0" />}
                                 </li>
                             ))}
+                            {!loading && (dashboardData?.tasks.length ?? 0) === 0 && <p className="text-sm text-muted-foreground">Задач пока нет.</p>}
                         </ul>
                     </div>
                 </div>

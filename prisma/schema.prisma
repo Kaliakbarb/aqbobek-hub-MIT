@@ -1,0 +1,484 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum UserRole {
+  student
+  teacher
+  admin
+  parent
+}
+
+enum AttendanceStatus {
+  present
+  absent
+  late
+  excused
+}
+
+enum RiskLevel {
+  low
+  medium
+  high
+}
+
+enum ApprovalStatus {
+  pending
+  approved
+  rejected
+}
+
+enum IncidentStatus {
+  open
+  resolved
+}
+
+enum NewsCategory {
+  announcement
+  olympiad
+  schedule
+  courses
+  sports
+  event
+}
+
+enum BroadcastAudienceType {
+  all
+  role
+  class
+}
+
+enum SchedulePlanStatus {
+  draft
+  published
+}
+
+enum EventLogKind {
+  mail
+  approval
+  incident
+  publish
+  system
+  schedule
+  ai
+}
+
+enum KioskItemType {
+  replacement
+  announcement
+  spotlight
+  cafeteria
+}
+
+enum ChatRole {
+  assistant
+  user
+}
+
+model User {
+  id           String       @id @default(cuid())
+  username     String       @unique
+  passwordHash String
+  role         UserRole
+  firstName    String
+  lastName     String
+  fullName     String
+  email        String?      @unique
+  avatarUrl    String?
+  homePath     String
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  student         Student?
+  teacher         Teacher?
+  settings        UserSettings?
+  parentLinks     ParentStudent[]        @relation("ParentLinks")
+  createdNews     NewsItem[]             @relation("NewsAuthor")
+  broadcasts      Broadcast[]            @relation("BroadcastAuthor")
+  approvalsDecided Approval[]            @relation("ApprovalDecisionBy")
+  incidentsOwned  Incident[]             @relation("IncidentOwner")
+  eventLogs       EventLog[]
+  schedulePlans   SchedulePlan[]
+  chatMessages    ChatMessage[]
+}
+
+model UserSettings {
+  id          String  @id @default(cuid())
+  userId      String  @unique
+  language    String  @default("Русский")
+  themeAuto   Boolean @default(true)
+  emailAlerts Boolean @default(true)
+  pushAlerts  Boolean @default(true)
+  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model SchoolClass {
+  id                 String               @id @default(cuid())
+  name               String               @unique
+  grade              Int
+  section            String
+  profile            String?
+  roomLabel          String?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  students           Student[]
+  teachingAssignments TeachingAssignment[]
+  scheduleSlots      ScheduleSlot[]
+  newsItems          NewsItem[]
+  broadcasts         Broadcast[]
+}
+
+model Subject {
+  id                 String               @id @default(cuid())
+  name               String               @unique
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  grades             Grade[]
+  attendanceRecords  AttendanceRecord[]
+  teachingAssignments TeachingAssignment[]
+  scheduleSlots      ScheduleSlot[]
+  riskAlerts         RiskAlert[]
+}
+
+model Student {
+  id               String            @id @default(cuid())
+  userId           String            @unique
+  classId          String
+  profileDirection String?
+  gpa              Float             @default(0)
+  homeworkPct      Float             @default(0)
+  rank             Int?
+  rankTotal        Int?
+  streakDays       Int               @default(0)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  schoolClass      SchoolClass       @relation(fields: [classId], references: [id])
+  grades           Grade[]
+  attendance       AttendanceRecord[]
+  goals            StudentGoal[]
+  achievements     Achievement[]
+  skills           StudentSkill[]
+  activityEntries  ActivityEntry[]
+  riskAlerts       RiskAlert[]
+  leaderboardEntries LeaderboardEntry[]
+  badges           StudentBadge[]
+  parentLinks      ParentStudent[]   @relation("StudentLinks")
+}
+
+model Teacher {
+  id          String               @id @default(cuid())
+  userId      String               @unique
+  bio         String?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  user        User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignments TeachingAssignment[]
+  tasks       TeacherTask[]
+  scheduleSlots ScheduleSlot[]
+}
+
+model ParentStudent {
+  id        String   @id @default(cuid())
+  parentId  String
+  studentId String
+  createdAt DateTime @default(now())
+
+  parent    User     @relation("ParentLinks", fields: [parentId], references: [id], onDelete: Cascade)
+  student   Student  @relation("StudentLinks", fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([parentId, studentId])
+}
+
+model TeachingAssignment {
+  id        String      @id @default(cuid())
+  teacherId String
+  subjectId String
+  classId   String
+  createdAt DateTime    @default(now())
+
+  teacher   Teacher     @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  subject   Subject     @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  schoolClass SchoolClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  @@unique([teacherId, subjectId, classId])
+}
+
+model Grade {
+  id           String    @id @default(cuid())
+  studentId    String
+  subjectId    String
+  type         String
+  displayValue String
+  numericValue Float?
+  percent      Float?
+  trend        String?
+  term         String?
+  status       String?
+  recordedAt   DateTime  @default(now())
+  createdAt    DateTime  @default(now())
+
+  student      Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subject      Subject   @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+}
+
+model AttendanceRecord {
+  id         String           @id @default(cuid())
+  studentId  String
+  subjectId  String?
+  status     AttendanceStatus
+  note       String?
+  recordedAt DateTime
+  createdAt  DateTime         @default(now())
+
+  student    Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subject    Subject?         @relation(fields: [subjectId], references: [id])
+}
+
+model StudentGoal {
+  id          String   @id @default(cuid())
+  studentId   String
+  title       String
+  daysLeft    Int?
+  completed   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+}
+
+model Achievement {
+  id          String   @id @default(cuid())
+  studentId   String
+  title       String
+  description String
+  icon        String
+  color       String
+  createdAt   DateTime @default(now())
+
+  student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+}
+
+model StudentSkill {
+  id        String   @id @default(cuid())
+  studentId String
+  name      String
+  createdAt DateTime @default(now())
+
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+}
+
+model ActivityEntry {
+  id         String   @id @default(cuid())
+  studentId  String
+  title      String
+  color      String
+  occurredAt DateTime
+  createdAt  DateTime @default(now())
+
+  student    Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+}
+
+model RiskAlert {
+  id          String    @id @default(cuid())
+  studentId   String
+  subjectId   String?
+  dropLabel   String
+  reason      String
+  riskLevel   RiskLevel
+  resolved    Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  student     Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subject     Subject?  @relation(fields: [subjectId], references: [id])
+}
+
+model TeacherTask {
+  id          String    @id @default(cuid())
+  teacherId   String
+  title       String
+  note        String?
+  done        Boolean   @default(false)
+  urgent      Boolean   @default(false)
+  dueAt       DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  teacher     Teacher   @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+}
+
+model SchedulePlan {
+  id          String             @id @default(cuid())
+  title       String
+  dayOfWeek   Int
+  status      SchedulePlanStatus @default(draft)
+  generatedAt DateTime           @default(now())
+  publishedAt DateTime?
+  createdById String?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  createdBy   User?              @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  slots       ScheduleSlot[]
+  conflicts   ScheduleConflict[]
+}
+
+model ScheduleSlot {
+  id             String       @id @default(cuid())
+  schedulePlanId String
+  classId        String
+  subjectId      String
+  teacherId      String?
+  timeLabel      String
+  room           String
+  split          Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+
+  schedulePlan   SchedulePlan @relation(fields: [schedulePlanId], references: [id], onDelete: Cascade)
+  schoolClass    SchoolClass  @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subject        Subject      @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  teacher        Teacher?     @relation(fields: [teacherId], references: [id], onDelete: SetNull)
+}
+
+model ScheduleConflict {
+  id             String       @id @default(cuid())
+  schedulePlanId String
+  title          String
+  description    String
+  severity       String
+  resolved       Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+
+  schedulePlan   SchedulePlan @relation(fields: [schedulePlanId], references: [id], onDelete: Cascade)
+}
+
+model LeaderboardEntry {
+  id        String   @id @default(cuid())
+  studentId String
+  category  String
+  points    Int
+  rank      Int
+  trend     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, category])
+}
+
+model StudentBadge {
+  id        String   @id @default(cuid())
+  studentId String
+  name      String
+  icon      String
+  color     String
+  bgColor   String
+  earnedAt  DateTime @default(now())
+
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+}
+
+model NewsItem {
+  id              String        @id @default(cuid())
+  category        NewsCategory
+  title           String
+  description     String
+  publishedAt     DateTime
+  highlight       Boolean       @default(false)
+  pinned          Boolean       @default(false)
+  createdByUserId String?
+  targetRole      UserRole?
+  targetClassId   String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  createdBy       User?         @relation("NewsAuthor", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  targetClass     SchoolClass?  @relation(fields: [targetClassId], references: [id], onDelete: SetNull)
+}
+
+model Broadcast {
+  id             String               @id @default(cuid())
+  audienceType   BroadcastAudienceType
+  audienceLabel  String
+  text           String
+  createdByUserId String?
+  targetRole     UserRole?
+  targetClassId  String?
+  createdAt      DateTime             @default(now())
+
+  createdBy      User?                @relation("BroadcastAuthor", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  targetClass    SchoolClass?         @relation(fields: [targetClassId], references: [id], onDelete: SetNull)
+}
+
+model Approval {
+  id           String         @id @default(cuid())
+  title        String
+  meta         String
+  priority     String
+  status       ApprovalStatus @default(pending)
+  decisionNote String?
+  decidedById  String?
+  decidedAt    DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  decidedBy    User?          @relation("ApprovalDecisionBy", fields: [decidedById], references: [id], onDelete: SetNull)
+}
+
+model Incident {
+  id          String         @id @default(cuid())
+  title       String
+  location    String
+  ownerLabel  String
+  ownerUserId String?
+  severity    String
+  status      IncidentStatus @default(open)
+  resolvedAt  DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  ownerUser   User?          @relation("IncidentOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+}
+
+model EventLog {
+  id        String       @id @default(cuid())
+  title     String
+  note      String
+  kind      EventLogKind
+  userId    String?
+  createdAt DateTime     @default(now())
+
+  user      User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+model KioskItem {
+  id        String        @id @default(cuid())
+  type      KioskItemType
+  title     String
+  body      String
+  priority  Int           @default(0)
+  active    Boolean       @default(true)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+}
+
+model ChatMessage {
+  id        String    @id @default(cuid())
+  userId    String
+  role      ChatRole
+  text      String
+  createdAt DateTime  @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}

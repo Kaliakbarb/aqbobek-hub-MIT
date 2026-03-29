@@ -1,33 +1,45 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Trophy, Medal, Star, Flame, Crown, ArrowUp, Zap, Brain, ShieldCheck } from "lucide-react";
 
-const rankings = {
-    "Общий рейтинг": [
-        { rank: 1, name: "Алиса Воронова", class: "11 А", points: 1450, trend: "up" },
-        { rank: 2, name: "Дамир Абишев", class: "11 В", points: 1395, trend: "up" },
-        { rank: 3, name: "Жанель Сапарова", class: "10 Б", points: 1320, trend: "down" },
-        { rank: 4, name: "Тимур Асанов", class: "10 А", points: 1280, trend: "up", me: true },
-        { rank: 5, name: "Илья Макаров", class: "10 В", points: 1105, trend: "-" },
-    ],
-    "Точные науки": [
-        { rank: 1, name: "Тимур Асанов", class: "10 А", points: 980, trend: "up", me: true },
-        { rank: 2, name: "Алиса Воронова", class: "11 А", points: 965, trend: "up" },
-        { rank: 3, name: "Дамир Абишев", class: "11 В", points: 910, trend: "down" },
-    ],
-    "Олимпиады": [
-        { rank: 1, name: "Жанель Сапарова", class: "10 Б", points: 620, trend: "up" },
-        { rank: 2, name: "Тимур Асанов", class: "10 А", points: 600, trend: "up", me: true },
-        { rank: 3, name: "Алиса Воронова", class: "11 А", points: 590, trend: "up" },
-    ],
+type LeaderboardPayload = {
+    rankings: Record<string, Array<{ rank: number; name: string; class: string; points: number; trend: string; me?: boolean }>>;
+    streakDays: number;
+    badges: Array<{ id: string; name: string; icon: string; color: string; bgColor: string }>;
 };
 
+const badgeIcons = {
+    Brain,
+    Zap,
+    Star,
+    Medal,
+    ShieldCheck,
+} as const;
+
 export default function Leaderboard() {
-    const [category, setCategory] = useState<keyof typeof rankings>("Общий рейтинг");
+    const [data, setData] = useState<LeaderboardPayload | null>(null);
+    const [category, setCategory] = useState<string>("Общий рейтинг");
     const [status, setStatus] = useState("Следите за рейтингом, бейджами и личным прогрессом по категориям.");
 
-    const students = useMemo(() => rankings[category], [category]);
+    useEffect(() => {
+        const load = async () => {
+            try {
+                const response = await fetch("/api/leaderboard");
+                const payload = await response.json();
+                if (!response.ok) throw new Error(payload?.error || "Не удалось загрузить рейтинг.");
+                setData(payload.leaderboard);
+                const firstCategory = Object.keys(payload.leaderboard.rankings)[0] ?? "Общий рейтинг";
+                setCategory(firstCategory);
+            } catch (error) {
+                setStatus(error instanceof Error ? error.message : "Не удалось загрузить рейтинг.");
+            }
+        };
+
+        void load();
+    }, []);
+
+    const students = useMemo(() => data?.rankings[category] ?? [], [data, category]);
 
     return (
         <div className="space-y-6 animate-fadeUp">
@@ -47,13 +59,13 @@ export default function Leaderboard() {
                     <div className="liquid-glass p-6 rounded-[2rem] bg-gradient-to-tr from-orange-50 to-white border-orange-100 flex flex-col items-center text-center">
                         <div className="w-20 h-20 rounded-full bg-orange-100 flex items-center justify-center text-orange-500 mb-4 shadow-sm relative">
                             <Flame className="w-10 h-10" />
-                            <span className="absolute -bottom-2 -right-2 bg-foreground text-background text-xs font-bold px-2 py-1 rounded-lg">x14</span>
+                            <span className="absolute -bottom-2 -right-2 bg-foreground text-background text-xs font-bold px-2 py-1 rounded-lg">x{data?.streakDays ?? 0}</span>
                         </div>
                         <h2 className="text-2xl font-sora font-bold text-foreground mb-1">Ударный темп!</h2>
-                        <p className="text-sm font-medium text-muted-foreground">14 дней подряд без пропусков домашних заданий</p>
+                        <p className="text-sm font-medium text-muted-foreground">{data?.streakDays ?? 0} дней подряд без пропусков домашних заданий</p>
                         <div className="flex gap-1 mt-4">
                             {[1, 2, 3, 4, 5, 6, 7].map((_, i) => (
-                                <div key={i} className={`w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-bold ${i < 6 ? "bg-orange-500 text-white" : "bg-black/5 text-muted-foreground"}`}>{["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"][i]}</div>
+                                <div key={i} className={`w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-bold ${i < Math.min(6, data?.streakDays ?? 0) ? "bg-orange-500 text-white" : "bg-black/5 text-muted-foreground"}`}>{["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"][i]}</div>
                             ))}
                         </div>
                     </div>
@@ -61,20 +73,14 @@ export default function Leaderboard() {
                     <div className="liquid-glass p-6 rounded-[2rem]">
                         <h2 className="text-lg font-sora font-bold text-foreground mb-4">Твои бейджи</h2>
                         <div className="grid grid-cols-3 gap-3">
-                            {[
-                                { icon: Brain, color: "text-purple-600", bg: "bg-purple-100", label: "Эрудит" },
-                                { icon: Zap, color: "text-amber-500", bg: "bg-amber-100", label: "Скорость" },
-                                { icon: Star, color: "text-blue-500", bg: "bg-blue-100", label: "Перфекционист" },
-                                { icon: Medal, color: "text-green-600", bg: "bg-green-100", label: "Спорт" },
-                                { icon: ShieldCheck, color: "text-foreground", bg: "bg-black/10", label: "Староста" },
-                            ].map((badge) => {
-                                const Icon = badge.icon;
+                            {data?.badges.map((badge) => {
+                                const Icon = badgeIcons[badge.icon as keyof typeof badgeIcons] ?? Star;
                                 return (
-                                    <button key={badge.label} onClick={() => setStatus(`Открыт бейдж «${badge.label}». Можно посмотреть, за что он был получен.`)} className="flex flex-col items-center gap-2 cursor-pointer group">
-                                        <div className={`w-14 h-14 rounded-full ${badge.bg} ${badge.color} flex items-center justify-center group-hover:scale-110 transition-transform shadow-sm`}>
+                                    <button key={badge.id} onClick={() => setStatus(`Открыт бейдж «${badge.name}». Можно посмотреть, за что он был получен.`)} className="flex flex-col items-center gap-2 cursor-pointer group">
+                                        <div className={`w-14 h-14 rounded-full ${badge.bgColor} ${badge.color} flex items-center justify-center group-hover:scale-110 transition-transform shadow-sm`}>
                                             <Icon className="w-6 h-6" />
                                         </div>
-                                        <span className="text-[10px] font-bold text-center text-muted-foreground uppercase tracking-wider">{badge.label}</span>
+                                        <span className="text-[10px] font-bold text-center text-muted-foreground uppercase tracking-wider">{badge.name}</span>
                                     </button>
                                 );
                             })}
@@ -85,18 +91,18 @@ export default function Leaderboard() {
                 <div className="lg:col-span-2 liquid-glass rounded-[2rem] p-0 overflow-hidden flex flex-col">
                     <div className="p-6 border-b border-border bg-white/50 backdrop-blur-md flex justify-between items-center">
                         <h2 className="text-lg font-sora font-bold text-foreground flex items-center gap-2">
-                            <Trophy className="w-5 h-5 text-yellow-500" /> Топ 10 школы (10-11 классы)
+                            <Trophy className="w-5 h-5 text-yellow-500" /> Топ школы
                         </h2>
                         <select
                             value={category}
                             onChange={(e) => {
-                                const next = e.target.value as keyof typeof rankings;
+                                const next = e.target.value;
                                 setCategory(next);
                                 setStatus(`Переключен рейтинг: ${next}.`);
                             }}
                             className="bg-transparent border border-border text-sm font-semibold rounded-lg px-2 py-1 text-muted-foreground focus:outline-none"
                         >
-                            {Object.keys(rankings).map((option) => (
+                            {Object.keys(data?.rankings ?? {}).map((option) => (
                                 <option key={option}>{option}</option>
                             ))}
                         </select>

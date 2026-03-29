@@ -1,19 +1,109 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { User, Bell, Shield, Palette, CheckCircle2 } from "lucide-react";
 
 type TabKey = "profile" | "notifications" | "security" | "appearance";
 
 export default function Settings() {
     const [tab, setTab] = useState<TabKey>("profile");
-    const [firstName, setFirstName] = useState("Тимур");
-    const [lastName, setLastName] = useState("Асанов");
+    const [firstName, setFirstName] = useState("");
+    const [lastName, setLastName] = useState("");
+    const [email, setEmail] = useState("");
     const [language, setLanguage] = useState("Русский");
     const [themeAuto, setThemeAuto] = useState(true);
     const [emailAlerts, setEmailAlerts] = useState(true);
     const [pushAlerts, setPushAlerts] = useState(true);
-    const [status, setStatus] = useState("Настройки синхронизируются локально в демо-режиме.");
+    const [currentPassword, setCurrentPassword] = useState("");
+    const [newPassword, setNewPassword] = useState("");
+    const [status, setStatus] = useState("Загружаем сохраненные настройки.");
+
+    useEffect(() => {
+        const load = async () => {
+            try {
+                const [meResponse, settingsResponse] = await Promise.all([
+                    fetch("/api/me"),
+                    fetch("/api/me/settings"),
+                ]);
+                const meData = await meResponse.json();
+                const settingsData = await settingsResponse.json();
+
+                if (!meResponse.ok) throw new Error(meData?.error || "Не удалось загрузить профиль.");
+                if (!settingsResponse.ok) throw new Error(settingsData?.error || "Не удалось загрузить настройки.");
+
+                setFirstName(meData.me.firstName);
+                setLastName(meData.me.lastName);
+                setEmail(meData.me.email ?? "");
+                setLanguage(settingsData.settings?.language ?? "Русский");
+                setThemeAuto(settingsData.settings?.themeAuto ?? true);
+                setEmailAlerts(settingsData.settings?.emailAlerts ?? true);
+                setPushAlerts(settingsData.settings?.pushAlerts ?? true);
+                setStatus("Настройки загружены из базы. Изменения сохраняются для текущего аккаунта.");
+            } catch (error) {
+                setStatus(error instanceof Error ? error.message : "Не удалось загрузить настройки.");
+            }
+        };
+
+        void load();
+    }, []);
+
+    const saveProfile = async () => {
+        try {
+            const [profileResponse, settingsResponse] = await Promise.all([
+                fetch("/api/me", {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ firstName, lastName }),
+                }),
+                fetch("/api/me/settings", {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ language, themeAuto, emailAlerts, pushAlerts }),
+                }),
+            ]);
+
+            const profileData = await profileResponse.json();
+            const settingsData = await settingsResponse.json();
+            if (!profileResponse.ok) throw new Error(profileData?.error || "Не удалось сохранить профиль.");
+            if (!settingsResponse.ok) throw new Error(settingsData?.error || "Не удалось сохранить настройки.");
+
+            setStatus(`Изменения сохранены: ${firstName} ${lastName}, язык ${language}.`);
+        } catch (error) {
+            setStatus(error instanceof Error ? error.message : "Не удалось сохранить настройки.");
+        }
+    };
+
+    const toggleSetting = async (patch: { emailAlerts?: boolean; pushAlerts?: boolean; themeAuto?: boolean }) => {
+        try {
+            const response = await fetch("/api/me/settings", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(patch),
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data?.error || "Не удалось обновить настройку.");
+            setStatus("Настройка обновлена.");
+        } catch (error) {
+            setStatus(error instanceof Error ? error.message : "Не удалось обновить настройку.");
+        }
+    };
+
+    const changePassword = async () => {
+        try {
+            const response = await fetch("/api/auth/change-password", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ currentPassword, newPassword }),
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data?.error || "Не удалось изменить пароль.");
+            setCurrentPassword("");
+            setNewPassword("");
+            setStatus("Пароль успешно обновлен.");
+        } catch (error) {
+            setStatus(error instanceof Error ? error.message : "Не удалось изменить пароль.");
+        }
+    };
 
     const tabs = [
         { key: "profile" as const, label: "Профиль", icon: User },
@@ -30,7 +120,7 @@ export default function Settings() {
                     <p className="text-muted-foreground mt-1 text-sm font-medium">Управление профилем и предпочтениями</p>
                 </div>
                 <button
-                    onClick={() => setStatus(`Изменения сохранены: ${firstName} ${lastName}, язык ${language}.`)}
+                    onClick={() => void saveProfile()}
                     className="bg-primary hover:bg-primary/90 text-white px-5 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm"
                 >
                     <CheckCircle2 className="w-4 h-4" /> Сохранить изменения
@@ -61,10 +151,10 @@ export default function Settings() {
                             <h2 className="text-xl font-sora font-bold text-foreground mb-6">Личные данные</h2>
                             <div className="flex items-center gap-6 mb-8 pb-8 border-b border-border">
                                 <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-primary to-secondary-accent text-white flex items-center justify-center font-sora font-bold text-2xl shadow-sm">
-                                    {firstName[0]}
+                                    {firstName[0] ?? "U"}
                                 </div>
                                 <div>
-                                    <button onClick={() => setStatus("Загрузка фото будет доступна после подключения бэкенда профиля.")} className="bg-white border border-border px-4 py-2 rounded-xl text-sm font-semibold hover:border-primary/50 mb-2 block">Изменить фото</button>
+                                    <button onClick={() => setStatus("Загрузка фото будет доступна после подключения хранилища файлов.")} className="bg-white border border-border px-4 py-2 rounded-xl text-sm font-semibold hover:border-primary/50 mb-2 block">Изменить фото</button>
                                     <p className="text-xs text-muted-foreground">Формат JPG, PNG. Макс 2 MB.</p>
                                 </div>
                             </div>
@@ -80,7 +170,7 @@ export default function Settings() {
                                 </div>
                                 <div className="sm:col-span-2">
                                     <label className="block text-sm font-bold text-foreground mb-2">Email</label>
-                                    <input type="email" value="demo@aqbobek.kz" disabled className="w-full bg-black/5 border border-border rounded-xl px-4 py-2.5 text-sm font-medium text-muted-foreground cursor-not-allowed" />
+                                    <input type="email" value={email} disabled className="w-full bg-black/5 border border-border rounded-xl px-4 py-2.5 text-sm font-medium text-muted-foreground cursor-not-allowed" />
                                     <p className="text-xs text-muted-foreground mt-2">Email привязан к школьной учетной записи. Для изменения обратитесь в администрацию.</p>
                                 </div>
                             </div>
@@ -91,14 +181,28 @@ export default function Settings() {
                         <div className="liquid-glass rounded-[2rem] p-8">
                             <h2 className="text-xl font-sora font-bold text-foreground mb-6">Уведомления</h2>
                             <div className="space-y-4">
-                                <button onClick={() => setEmailAlerts((v) => !v)} className="w-full flex items-center justify-between p-4 bg-white/40 rounded-xl border border-border text-left">
+                                <button
+                                    onClick={() => {
+                                        const next = !emailAlerts;
+                                        setEmailAlerts(next);
+                                        void toggleSetting({ emailAlerts: next });
+                                    }}
+                                    className="w-full flex items-center justify-between p-4 bg-white/40 rounded-xl border border-border text-left"
+                                >
                                     <div>
                                         <h4 className="font-bold text-sm text-foreground">Email-уведомления</h4>
                                         <p className="text-xs text-muted-foreground mt-1">Получать сводки по оценкам и событиям</p>
                                     </div>
                                     <span className={`px-3 py-1 rounded-full text-xs font-bold ${emailAlerts ? "bg-green-100 text-green-700" : "bg-black/5 text-muted-foreground"}`}>{emailAlerts ? "Вкл" : "Выкл"}</span>
                                 </button>
-                                <button onClick={() => setPushAlerts((v) => !v)} className="w-full flex items-center justify-between p-4 bg-white/40 rounded-xl border border-border text-left">
+                                <button
+                                    onClick={() => {
+                                        const next = !pushAlerts;
+                                        setPushAlerts(next);
+                                        void toggleSetting({ pushAlerts: next });
+                                    }}
+                                    className="w-full flex items-center justify-between p-4 bg-white/40 rounded-xl border border-border text-left"
+                                >
                                     <div>
                                         <h4 className="font-bold text-sm text-foreground">Push-уведомления</h4>
                                         <p className="text-xs text-muted-foreground mt-1">Срочные сообщения, дедлайны и напоминания</p>
@@ -114,10 +218,24 @@ export default function Settings() {
                             <h2 className="text-xl font-sora font-bold text-foreground mb-6">Безопасность</h2>
                             <div className="space-y-4">
                                 <div className="p-4 bg-white/40 rounded-xl border border-border">
-                                    <h4 className="font-bold text-sm text-foreground">Двухфакторная защита</h4>
-                                    <p className="text-xs text-muted-foreground mt-1">В демо-версии включение имитируется на фронте.</p>
+                                    <h4 className="font-bold text-sm text-foreground">Пароль аккаунта</h4>
+                                    <p className="text-xs text-muted-foreground mt-1">Изменение выполняется через backend и сохраняет bcrypt-хеш в базе данных.</p>
                                 </div>
-                                <button onClick={() => setStatus("Черновик сценария смены пароля открыт. Реальное изменение будет доступно после подключения бэкенда.")} className="bg-white border border-border px-4 py-2 rounded-xl text-sm font-semibold hover:border-primary/50">
+                                <input
+                                    type="password"
+                                    value={currentPassword}
+                                    onChange={(e) => setCurrentPassword(e.target.value)}
+                                    placeholder="Текущий пароль"
+                                    className="w-full bg-white/50 border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 font-medium text-foreground"
+                                />
+                                <input
+                                    type="password"
+                                    value={newPassword}
+                                    onChange={(e) => setNewPassword(e.target.value)}
+                                    placeholder="Новый пароль"
+                                    className="w-full bg-white/50 border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 font-medium text-foreground"
+                                />
+                                <button onClick={() => void changePassword()} className="bg-white border border-border px-4 py-2 rounded-xl text-sm font-semibold hover:border-primary/50">
                                     Сменить пароль
                                 </button>
                             </div>
@@ -140,7 +258,14 @@ export default function Settings() {
                                     </select>
                                 </div>
 
-                                <button onClick={() => setThemeAuto((v) => !v)} className="w-full flex items-center justify-between p-4 bg-white/40 rounded-xl border border-border text-left">
+                                <button
+                                    onClick={() => {
+                                        const next = !themeAuto;
+                                        setThemeAuto(next);
+                                        void toggleSetting({ themeAuto: next });
+                                    }}
+                                    className="w-full flex items-center justify-between p-4 bg-white/40 rounded-xl border border-border text-left"
+                                >
                                     <div>
                                         <h4 className="font-bold text-sm text-foreground">Светлая/Темная тема</h4>
                                         <p className="text-xs text-muted-foreground mt-1">{themeAuto ? "Автоматически по системе" : "Светлая тема"}</p>
