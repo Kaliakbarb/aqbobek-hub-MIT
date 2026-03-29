@@ -1,0 +1,21 @@
+{
+    "relevance_labels": {
+        "very_high": "очень подходит",
+        "high": "подходит",
+        "medium": "можно рекомендовать",
+        "low": "слабое соответствие"
+    },
+    "content_types": [
+        "video",
+        "quiz",
+        "article",
+        "practice",
+        "summary",
+        "flashcards"
+    ],
+    "languages": [
+        "ru",
+        "en",
+        "kz"
+    ]
+}

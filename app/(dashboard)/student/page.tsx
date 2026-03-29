@@ -24,6 +24,25 @@ type StudentDashboardPayload = {
         primaryRisk: { title: string; probability: number; reason: string } | null;
         topSubject: { title: string; text: string } | null;
     };
+    topicWeakness: Array<{
+        subjectName: string;
+        topicName: string;
+        weak_topic_probability: number;
+        risk_level: "strong" | "medium" | "weak";
+        risk_level_ru: string;
+        reason: string;
+    }>;
+    resourceRecommendations: Array<{
+        resource_id: string;
+        title_ru: string;
+        subject_name: string;
+        topic_name: string;
+        content_type: string;
+        language: string;
+        estimated_minutes: number;
+        predicted_relevance_score: number;
+        relevance_label_ru: string;
+    }>;
     news: Array<{ id: string; title: string; date: string }>;
 };
 
@@ -69,7 +88,31 @@ export default function StudentDashboard() {
     const student = dashboard?.student;
     const subjects = dashboard?.subjects ?? [];
     const lessons = dashboard?.lessons ?? [];
+    const topicWeakness = dashboard?.topicWeakness ?? [];
+    const resourceRecommendations = dashboard?.resourceRecommendations ?? [];
     const news = dashboard?.news ?? [];
+
+    const riskTone = (level: "strong" | "medium" | "weak") => {
+        if (level === "weak") {
+            return {
+                badge: "bg-red-500/10 text-red-700",
+                progress: "bg-red-500",
+                card: "border-red-200 bg-red-50/70",
+            };
+        }
+        if (level === "medium") {
+            return {
+                badge: "bg-amber-500/10 text-amber-700",
+                progress: "bg-amber-500",
+                card: "border-amber-200 bg-amber-50/70",
+            };
+        }
+        return {
+            badge: "bg-green-500/10 text-green-700",
+            progress: "bg-green-500",
+            card: "border-green-200 bg-green-50/70",
+        };
+    };
 
     return (
         <div className="space-y-6 animate-fadeUp">
@@ -234,6 +277,88 @@ export default function StudentDashboard() {
                                 </button>
                             ))}
                             {!loading && subjects.length === 0 && <p className="text-sm text-muted-foreground">Оценки пока не загружены.</p>}
+                        </div>
+                    </div>
+
+                    <div className="liquid-glass p-6 rounded-[2rem]">
+                        <div className="flex items-center justify-between gap-3 mb-5">
+                            <div>
+                                <h2 className="text-lg font-sora font-bold text-foreground">Слабые темы по ML-модели</h2>
+                                <p className="text-xs text-muted-foreground mt-1">Точечная диагностика внутри предметов для рекомендаций и повтора.</p>
+                            </div>
+                            <AlertTriangle className="w-5 h-5 text-orange-500" />
+                        </div>
+
+                        <div className="space-y-4">
+                            {topicWeakness.map((item) => {
+                                const tone = riskTone(item.risk_level);
+                                return (
+                                    <div key={`${item.subjectName}-${item.topicName}`} className={`rounded-2xl border p-4 ${tone.card}`}>
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div>
+                                                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{item.subjectName}</p>
+                                                <h3 className="text-base font-semibold text-foreground mt-1">{item.topicName}</h3>
+                                            </div>
+                                            <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${tone.badge}`}>
+                                                {item.risk_level_ru}
+                                            </span>
+                                        </div>
+
+                                        <div className="mt-4">
+                                            <div className="flex items-center justify-between text-xs font-medium text-muted-foreground mb-2">
+                                                <span>Вероятность слабой темы</span>
+                                                <span>{Math.round(item.weak_topic_probability * 100)}%</span>
+                                            </div>
+                                            <div className="w-full bg-white/80 rounded-full h-2">
+                                                <div className={`h-2 rounded-full ${tone.progress}`} style={{ width: `${Math.round(item.weak_topic_probability * 100)}%` }}></div>
+                                            </div>
+                                        </div>
+
+                                        <p className="text-sm text-muted-foreground mt-3 leading-relaxed">
+                                            {item.reason}
+                                        </p>
+                                    </div>
+                                );
+                            })}
+                            {!loading && topicWeakness.length === 0 && <p className="text-sm text-muted-foreground">Для диагностики по темам пока недостаточно данных.</p>}
+                        </div>
+                    </div>
+
+                    <div className="liquid-glass p-6 rounded-[2rem]">
+                        <div className="flex items-center justify-between gap-3 mb-5">
+                            <div>
+                                <h2 className="text-lg font-sora font-bold text-foreground">Рекомендованные материалы</h2>
+                                <p className="text-xs text-muted-foreground mt-1">Подборка после weak topic detection с ранжированием по relevance score.</p>
+                            </div>
+                            <BookOpen className="w-5 h-5 text-primary" />
+                        </div>
+
+                        <div className="space-y-3">
+                            {resourceRecommendations.map((resource) => (
+                                <div key={resource.resource_id} className="rounded-2xl border border-primary/10 bg-white/60 p-4 backdrop-blur-sm">
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div>
+                                            <p className="text-sm font-semibold text-foreground">{resource.title_ru}</p>
+                                            <p className="text-xs text-muted-foreground mt-1">
+                                                {resource.subject_name} • {resource.topic_name}
+                                            </p>
+                                        </div>
+                                        <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-bold text-primary">
+                                            {resource.relevance_label_ru}
+                                        </span>
+                                    </div>
+
+                                    <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                                        <span className="rounded-full bg-black/5 px-2.5 py-1">{resource.content_type}</span>
+                                        <span className="rounded-full bg-black/5 px-2.5 py-1">{resource.language}</span>
+                                        <span className="rounded-full bg-black/5 px-2.5 py-1">{resource.estimated_minutes} мин</span>
+                                        <span className="rounded-full bg-black/5 px-2.5 py-1">
+                                            relevance {Math.round(resource.predicted_relevance_score * 100)}%
+                                        </span>
+                                    </div>
+                                </div>
+                            ))}
+                            {!loading && resourceRecommendations.length === 0 && <p className="text-sm text-muted-foreground">Подходящие материалы пока не найдены.</p>}
                         </div>
                     </div>
                 </div>

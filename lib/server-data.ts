@@ -11,6 +11,10 @@ import {
     UserRole,
 } from "@prisma/client";
 import { prisma } from "./prisma";
+import { getStudentResourceRecommendations } from "./resource-recommender";
+import { getScheduleQualitySummary } from "./schedule-quality";
+import { getScheduleSubstituteMatches } from "./substitute-matcher";
+import { getStudentTopicWeaknessSummary } from "./topic-weakness";
 
 const dateFormatter = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long" });
 const monthFormatter = new Intl.DateTimeFormat("ru-RU", { month: "long", year: "numeric" });
@@ -213,7 +217,11 @@ export async function getStudentDashboard(userId: string) {
         },
     });
 
-    const news = await getVisibleNews(userId);
+    const [news, topicWeakness] = await Promise.all([
+        getVisibleNews(userId),
+        getStudentTopicWeaknessSummary(user.student.id),
+    ]);
+    const resourceRecommendations = await getStudentResourceRecommendations(user.student.id, topicWeakness, 5);
     const subjectMap = new Map<string, { name: string; grade: string; trend: string; progress: number; color: string }>();
 
     for (const grade of user.student.grades) {
@@ -262,6 +270,8 @@ export async function getStudentDashboard(userId: string) {
                 text: `Последние результаты по предмету держатся на уровне ${topSubject.grade}. Продолжай в том же темпе.`,
             } : null,
         },
+        topicWeakness,
+        resourceRecommendations,
         news: news.slice(0, 2),
     };
 }
@@ -531,12 +541,20 @@ export async function getScheduleDashboard() {
     });
 
     const classes = await prisma.schoolClass.findMany({ orderBy: { name: "asc" } });
+    const [quality, substituteMatch] = plan
+        ? await Promise.all([
+            getScheduleQualitySummary(plan.id),
+            getScheduleSubstituteMatches(plan.id),
+        ])
+        : [null, null];
 
     if (!plan) {
         return {
             plan: null,
             classes: classes.map((item) => ({ id: item.id, name: item.name, slots: [] })),
             conflicts: [],
+            quality: null,
+            substituteMatch: null,
         };
     }
 
@@ -567,6 +585,8 @@ export async function getScheduleDashboard() {
             severity: item.severity,
             resolved: item.resolved,
         })),
+        quality,
+        substituteMatch,
     };
 }
 

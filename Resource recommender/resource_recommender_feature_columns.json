@@ -1,0 +1,28 @@
+{
+    "numerical_cols": [
+        "weak_topic_probability",
+        "topic_mastery_score",
+        "exam_proximity_days",
+        "engagement_score",
+        "available_study_minutes",
+        "resource_difficulty_level",
+        "resource_estimated_minutes",
+        "resource_quality_score",
+        "resource_popularity_score",
+        "resource_exam_focus",
+        "resource_interactivity_score",
+        "subject_match",
+        "topic_match",
+        "language_match",
+        "content_type_match",
+        "difficulty_gap",
+        "time_fit_score"
+    ],
+    "categorical_cols": [
+        "grade_level",
+        "preferred_language",
+        "preferred_content_type",
+        "resource_content_type",
+        "resource_language"
+    ]
+}
