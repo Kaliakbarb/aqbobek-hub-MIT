@@ -4,7 +4,7 @@ import Link from "next/link";
 import React, { useEffect, useState } from "react";
 import {
     TrendingUp, TrendingDown, BookOpen, AlertTriangle,
-    Target, GraduationCap, Award, Calendar, Lightbulb, ChevronRight, Activity, Sparkles, CheckCircle2,
+    Target, GraduationCap, Award, Calendar, Lightbulb, ChevronRight, Activity, Sparkles, CheckCircle2, BellRing,
 } from "lucide-react";
 
 type StudentDashboardPayload = {
@@ -19,6 +19,15 @@ type StudentDashboardPayload = {
     };
     subjects: Array<{ name: string; grade: string; trend: string; progress: number; color: string }>;
     lessons: Array<{ id: string; time: string; title: string; room: string; highlight?: boolean }>;
+    scheduleMeta: { weekLabel: string | null; pushAlertsEnabled: boolean; currentDayOfWeek: number; maxSlotsPerDay: number };
+    scheduleDays: Array<{
+        dayOfWeek: number;
+        dayLabel: string;
+        shortLabel: string;
+        lessonCount: number;
+        slots: Array<{ id: string; slotIndex: number; durationSlots: number; time: string; title: string; teacher: string; room: string; sourceType: string; isChanged: boolean; statusLabel: string; statusTone: string; homework: string; focusNote: string }>;
+    }>;
+    notices: Array<{ id: string; text: string; audience: string; createdAt: string }>;
     goal: { id: string; title: string; daysLeft: number | null } | null;
     insights: {
         primaryRisk: { title: string; probability: number; reason: string } | null;
@@ -88,6 +97,8 @@ export default function StudentDashboard() {
     const student = dashboard?.student;
     const subjects = dashboard?.subjects ?? [];
     const lessons = dashboard?.lessons ?? [];
+    const scheduleDays = dashboard?.scheduleDays ?? [];
+    const notices = dashboard?.notices ?? [];
     const topicWeakness = dashboard?.topicWeakness ?? [];
     const resourceRecommendations = dashboard?.resourceRecommendations ?? [];
     const news = dashboard?.news ?? [];
@@ -190,6 +201,29 @@ export default function StudentDashboard() {
                         {dashboard?.goal?.daysLeft != null ? `Осталось ${dashboard.goal.daysLeft} дня` : "Можно добавить новую цель в профиле"}
                     </p>
                 </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+                <Link href="/student/schedule" className="liquid-glass p-5 rounded-3xl border border-primary/10 hover:border-primary/30 transition-colors">
+                    <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Быстрый переход</p>
+                    <p className="mt-2 text-lg font-sora font-bold text-foreground">Полное расписание</p>
+                    <p className="mt-1 text-sm text-muted-foreground">Открыть неделю по дням, слотам и изменениям.</p>
+                </Link>
+                <Link href="/student/homework" className="liquid-glass p-5 rounded-3xl border border-border/60 hover:border-primary/30 transition-colors">
+                    <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Домашка</p>
+                    <p className="mt-2 text-lg font-sora font-bold text-foreground">Сдача заданий</p>
+                    <p className="mt-1 text-sm text-muted-foreground">Загрузить файл, сохранить черновик и увидеть комментарий учителя.</p>
+                </Link>
+                <Link href="/student/profile" className="liquid-glass p-5 rounded-3xl border border-border/60 hover:border-primary/30 transition-colors">
+                    <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Портфолио</p>
+                    <p className="mt-2 text-lg font-sora font-bold text-foreground">Достижения и профиль</p>
+                    <p className="mt-1 text-sm text-muted-foreground">Посмотреть сильные стороны, бейджи и прогресс.</p>
+                </Link>
+                <Link href="/leaderboard" className="liquid-glass p-5 rounded-3xl border border-border/60 hover:border-primary/30 transition-colors">
+                    <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Рейтинг</p>
+                    <p className="mt-2 text-lg font-sora font-bold text-foreground">Школьный leaderboard</p>
+                    <p className="mt-1 text-sm text-muted-foreground">Понять своё место в общем рейтинге и сравнить динамику.</p>
+                </Link>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -365,8 +399,35 @@ export default function StudentDashboard() {
 
                 <div className="space-y-6">
                     <div className="liquid-glass p-6 rounded-[2rem]">
+                        <div className="flex items-center justify-between gap-3 mb-4">
+                            <div>
+                                <h2 className="text-lg font-sora font-bold text-foreground">Push и изменения</h2>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    {dashboard?.scheduleMeta.pushAlertsEnabled
+                                        ? "Адресные сообщения из Broadcast и обновления расписания."
+                                        : "Push в профиле выключены, но события всё равно сохранены в системе."}
+                                </p>
+                            </div>
+                            <BellRing className="w-5 h-5 text-primary" />
+                        </div>
+
+                        <div className="space-y-3">
+                            {notices.map((item) => (
+                                <div key={item.id} className="rounded-2xl border border-primary/10 bg-white/60 p-4 backdrop-blur-sm">
+                                    <p className="text-sm font-semibold text-foreground">{item.text}</p>
+                                    <p className="mt-1 text-xs text-muted-foreground">{item.audience} • {item.createdAt}</p>
+                                </div>
+                            ))}
+                            {!loading && notices.length === 0 && <p className="text-sm text-muted-foreground">Новых адресных уведомлений пока нет.</p>}
+                        </div>
+                    </div>
+
+                    <div className="liquid-glass p-6 rounded-[2rem]">
                         <div className="flex items-center justify-between mb-5">
-                            <h2 className="text-lg font-sora font-bold text-foreground">Ближайшее расписание</h2>
+                            <div>
+                                <h2 className="text-lg font-sora font-bold text-foreground">Расписание на ближайшие уроки</h2>
+                                <p className="text-xs text-muted-foreground mt-1">{dashboard?.scheduleMeta.weekLabel ?? "Неделя пока не опубликована"}</p>
+                            </div>
                             <Calendar className="w-5 h-5 text-muted-foreground" />
                         </div>
 
@@ -387,9 +448,42 @@ export default function StudentDashboard() {
                             ))}
                             {!loading && lessons.length === 0 && <p className="text-sm text-muted-foreground">Опубликованное расписание пока отсутствует.</p>}
                         </div>
-                        <Link href="/admin/schedule" className="w-full mt-6 text-sm font-semibold text-primary flex items-center justify-center gap-1 hover:text-primary/80 transition-colors">
-                            Полное расписание <ChevronRight className="w-4 h-4" />
+                        <Link href="/student/schedule" className="w-full mt-6 text-sm font-semibold text-primary flex items-center justify-center gap-1 hover:text-primary/80 transition-colors">
+                            Открыть полное расписание <ChevronRight className="w-4 h-4" />
                         </Link>
+                    </div>
+
+                    <div className="liquid-glass p-6 rounded-[2rem]">
+                        <h2 className="text-lg font-sora font-bold text-foreground mb-4">Обзор недели</h2>
+                        <div className="space-y-3">
+                            {scheduleDays.map((day) => (
+                                <div key={day.dayOfWeek} className="rounded-2xl border border-border/60 bg-white/50 p-4">
+                                    <div className="flex items-center justify-between gap-3">
+                                        <div>
+                                            <p className="text-sm font-semibold text-foreground">{day.dayLabel}</p>
+                                            <p className="text-xs text-muted-foreground mt-1">{day.lessonCount} уроков</p>
+                                        </div>
+                                        <span className="rounded-full bg-black/5 px-2.5 py-1 text-xs font-bold text-muted-foreground">
+                                            {day.shortLabel}
+                                        </span>
+                                    </div>
+                                    <div className="mt-3 flex flex-wrap gap-2">
+                                        {day.slots.slice(0, 3).map((slot) => (
+                                            <span
+                                                key={slot.id}
+                                                className={`rounded-full px-2.5 py-1 text-xs font-medium ${slot.isChanged ? "bg-orange-100 text-orange-700" : "bg-black/5 text-muted-foreground"}`}
+                                            >
+                                                {slot.time} • {slot.title}
+                                            </span>
+                                        ))}
+                                    </div>
+                                    <Link href="/student/schedule" className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary/80">
+                                        Смотреть день полностью <ChevronRight className="w-3.5 h-3.5" />
+                                    </Link>
+                                </div>
+                            ))}
+                            {!loading && scheduleDays.length === 0 && <p className="text-sm text-muted-foreground">Понедельная сетка ещё не опубликована.</p>}
+                        </div>
                     </div>
 
                     <div className="liquid-glass p-6 rounded-[2rem]">
