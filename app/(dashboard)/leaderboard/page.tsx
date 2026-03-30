@@ -6,7 +6,7 @@ import { Trophy, Medal, Star, Flame, Crown, ArrowUp, Zap, Brain, ShieldCheck } f
 type LeaderboardPayload = {
     rankings: Record<string, Array<{ rank: number; name: string; class: string; points: number; trend: string; me?: boolean }>>;
     streakDays: number;
-    badges: Array<{ id: string; name: string; icon: string; color: string; bgColor: string }>;
+    badges: Array<{ id: string; name: string; icon: string; color: string; bgColor: string; reason: string; unlockHint: string; impact: string }>;
 };
 
 const badgeIcons = {
@@ -21,6 +21,7 @@ export default function Leaderboard() {
     const [data, setData] = useState<LeaderboardPayload | null>(null);
     const [category, setCategory] = useState<string>("Общий рейтинг");
     const [status, setStatus] = useState("Следите за рейтингом, бейджами и личным прогрессом по категориям.");
+    const [selectedBadgeId, setSelectedBadgeId] = useState<string | null>(null);
 
     useEffect(() => {
         const load = async () => {
@@ -31,6 +32,7 @@ export default function Leaderboard() {
                 setData(payload.leaderboard);
                 const firstCategory = Object.keys(payload.leaderboard.rankings)[0] ?? "Общий рейтинг";
                 setCategory(firstCategory);
+                setSelectedBadgeId(payload.leaderboard.badges?.[0]?.id ?? null);
             } catch (error) {
                 setStatus(error instanceof Error ? error.message : "Не удалось загрузить рейтинг.");
             }
@@ -40,6 +42,10 @@ export default function Leaderboard() {
     }, []);
 
     const students = useMemo(() => data?.rankings[category] ?? [], [data, category]);
+    const selectedBadge = useMemo(
+        () => data?.badges.find((badge) => badge.id === selectedBadgeId) ?? data?.badges[0] ?? null,
+        [data, selectedBadgeId],
+    );
 
     return (
         <div className="space-y-6 animate-fadeUp">
@@ -75,15 +81,45 @@ export default function Leaderboard() {
                         <div className="grid grid-cols-3 gap-3">
                             {data?.badges.map((badge) => {
                                 const Icon = badgeIcons[badge.icon as keyof typeof badgeIcons] ?? Star;
+                                const isSelected = badge.id === selectedBadge?.id;
                                 return (
-                                    <button key={badge.id} onClick={() => setStatus(`Открыт бейдж «${badge.name}». Можно посмотреть, за что он был получен.`)} className="flex flex-col items-center gap-2 cursor-pointer group">
-                                        <div className={`w-14 h-14 rounded-full ${badge.bgColor} ${badge.color} flex items-center justify-center group-hover:scale-110 transition-transform shadow-sm`}>
+                                    <button
+                                        key={badge.id}
+                                        onClick={() => {
+                                            setSelectedBadgeId(badge.id);
+                                            setStatus(`Выбран бейдж «${badge.name}». Ниже показано, за что он выдан и чем он ценен.`);
+                                        }}
+                                        className="flex flex-col items-center gap-2 cursor-pointer group"
+                                    >
+                                        <div className={`w-14 h-14 rounded-full ${badge.bgColor} ${badge.color} flex items-center justify-center group-hover:scale-110 transition-transform shadow-sm ${isSelected ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : ""}`}>
                                             <Icon className="w-6 h-6" />
                                         </div>
                                         <span className="text-[10px] font-bold text-center text-muted-foreground uppercase tracking-wider">{badge.name}</span>
                                     </button>
                                 );
                             })}
+                        </div>
+
+                        <div className="mt-5 rounded-2xl border border-primary/10 bg-white/60 p-4">
+                            {selectedBadge ? (
+                                <>
+                                    <p className="text-sm font-bold text-foreground">{selectedBadge.name}</p>
+                                    <div className="mt-3 rounded-xl bg-black/5 px-3 py-2">
+                                        <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">За что</p>
+                                        <p className="mt-1 text-xs text-foreground/80">{selectedBadge.reason}</p>
+                                    </div>
+                                    <div className="mt-2 rounded-xl bg-primary/5 px-3 py-2">
+                                        <p className="text-[11px] font-bold uppercase tracking-wider text-primary/80">Как получают</p>
+                                        <p className="mt-1 text-xs text-foreground/80">{selectedBadge.unlockHint}</p>
+                                    </div>
+                                    <div className="mt-2 rounded-xl bg-orange-50 px-3 py-2">
+                                        <p className="text-[11px] font-bold uppercase tracking-wider text-orange-700/80">Почему это важно</p>
+                                        <p className="mt-1 text-xs text-foreground/80">{selectedBadge.impact}</p>
+                                    </div>
+                                </>
+                            ) : (
+                                <p className="text-sm text-muted-foreground">Бейджи пока не получены.</p>
+                            )}
                         </div>
                     </div>
                 </div>

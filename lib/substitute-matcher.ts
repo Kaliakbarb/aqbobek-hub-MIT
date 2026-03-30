@@ -1,7 +1,8 @@
-import { ApprovalStatus } from "@prisma/client";
 import { spawn } from "node:child_process";
 import path from "node:path";
+import { TeacherAbsenceStatus } from "@prisma/client";
 import { prisma } from "./prisma";
+import { DAY_CODE_MAP } from "./schedule-constants";
 
 type LessonContext = {
     subject_name: string;
@@ -71,14 +72,6 @@ const SUBJECT_NORMALIZATION: Record<string, string> = {
     "История Казахстана": "История",
 };
 
-const DAY_MAP: Record<number, LessonContext["day_of_week"]> = {
-    1: "Mon",
-    2: "Tue",
-    3: "Wed",
-    4: "Thu",
-    5: "Fri",
-};
-
 function clamp(value: number, min: number, max: number) {
     return Math.min(Math.max(value, min), max);
 }
@@ -87,14 +80,8 @@ function normalizeSubjectName(subjectName: string) {
     return SUBJECT_NORMALIZATION[subjectName] ?? subjectName;
 }
 
-function parseStartMinutes(timeLabel: string) {
-    const match = timeLabel.match(/(\d{1,2}):(\d{2})/);
-    if (!match) return Number.MAX_SAFE_INTEGER;
-    return Number(match[1]) * 60 + Number(match[2]);
-}
-
-function inferRoomTypeRequired(subjectName: string, room: string): LessonContext["room_type_required"] {
-    const normalizedRoom = room.toLowerCase();
+function inferRoomTypeRequired(subjectName: string, roomName: string): LessonContext["room_type_required"] {
+    const normalizedRoom = roomName.toLowerCase();
     const normalizedSubject = normalizeSubjectName(subjectName);
     if (normalizedRoom.includes("lab") || normalizedRoom.includes("лаб")) return "lab";
     if (normalizedRoom.includes("it") || normalizedRoom.includes("комп")) return "computer";
@@ -265,15 +252,16 @@ export async function rankSubstituteCandidates(
     }
 }
 
-export async function getScheduleSubstituteMatches(planId?: string): Promise<SubstituteMatchSummary | null> {
+export async function buildSubstituteMatchSummary(input: { planId?: string; slotId?: string; teacherId?: string }) {
     const plan = await prisma.schedulePlan.findFirst({
-        where: planId ? { id: planId } : undefined,
-        orderBy: planId ? undefined : [{ status: "desc" }, { updatedAt: "desc" }],
+        where: input.planId ? { id: input.planId } : { status: "published" },
+        orderBy: input.planId ? undefined : { publishedAt: "desc" },
         include: {
             slots: {
                 include: {
                     schoolClass: true,
                     subject: true,
+                    room: true,
                     teacher: {
                         include: {
                             user: true,
@@ -292,27 +280,11 @@ export async function getScheduleSubstituteMatches(planId?: string): Promise<Sub
 
     if (!plan) return null;
 
-    const absenceApproval = await prisma.approval.findFirst({
-        where: {
-            status: {
-                in: [ApprovalStatus.pending, ApprovalStatus.approved],
-            },
-            title: {
-                contains: "Больничный:",
-            },
-        },
-        orderBy: { createdAt: "asc" },
-    });
-    if (!absenceApproval) return null;
+    const targetSlot = input.slotId
+        ? plan.slots.find((slot) => slot.id === input.slotId) ?? null
+        : plan.slots.find((slot) => slot.teacherId === input.teacherId) ?? null;
 
-    const teacherName = absenceApproval.title.split("Больничный:")[1]?.trim();
-    if (!teacherName) return null;
-
-    const targetSlot = [...plan.slots]
-        .filter((slot) => slot.teacher?.user.fullName === teacherName)
-        .sort((left, right) => parseStartMinutes(left.timeLabel) - parseStartMinutes(right.timeLabel))[0];
-
-    if (!targetSlot?.teacher) return null;
+    if (!targetSlot?.teacher || !targetSlot.subject) return null;
 
     const teachers = await prisma.teacher.findMany({
         include: {
@@ -323,31 +295,27 @@ export async function getScheduleSubstituteMatches(planId?: string): Promise<Sub
                     schoolClass: true,
                 },
             },
+            scheduleSlots: {
+                where: { schedulePlanId: plan.id },
+                include: {
+                    room: true,
+                },
+            },
         },
     });
 
-    const timeLabels = [...new Set(plan.slots.map((slot) => slot.timeLabel))].sort((left, right) => parseStartMinutes(left) - parseStartMinutes(right));
-    const timeIndexMap = new Map(timeLabels.map((timeLabel, index) => [timeLabel, index + 1]));
-    const targetSlotIndex = timeIndexMap.get(targetSlot.timeLabel) ?? 1;
-    const roomTypeRequired = inferRoomTypeRequired(targetSlot.subject.name, targetSlot.room);
+    const roomName = targetSlot.room?.name ?? "Без кабинета";
+    const roomTypeRequired = inferRoomTypeRequired(targetSlot.subject.name, roomName);
     const lessonContext: LessonContext = {
         subject_name: normalizeSubjectName(targetSlot.subject.name),
         grade_level: targetSlot.schoolClass.grade,
         class_group_type: inferClassGroupType(targetSlot.split, roomTypeRequired),
-        lesson_slot_index: targetSlotIndex,
-        day_of_week: DAY_MAP[plan.dayOfWeek] ?? "Mon",
+        lesson_slot_index: targetSlot.slotIndex,
+        day_of_week: DAY_CODE_MAP[targetSlot.dayOfWeek] ?? "Mon",
         room_type_required: roomTypeRequired,
         stream_complexity_level: inferStreamComplexityLevel(targetSlot.split, roomTypeRequired, targetSlot.schoolClass.grade),
         original_teacher_experience_years: inferTeacherExperienceYears(targetSlot.teacher.assignments.length),
     };
-
-    const slotTeacherLoads = new Map<string, typeof plan.slots>();
-    for (const slot of plan.slots) {
-        if (!slot.teacherId) continue;
-        const teacherSlots = slotTeacherLoads.get(slot.teacherId) ?? [];
-        teacherSlots.push(slot);
-        slotTeacherLoads.set(slot.teacherId, teacherSlots);
-    }
 
     const candidates = teachers
         .filter((teacher) => teacher.id !== targetSlot.teacherId)
@@ -360,16 +328,16 @@ export async function getScheduleSubstituteMatches(planId?: string): Promise<Sub
                 }, new Map());
 
             const specializations = [...assignmentsBySubject.entries()].sort((left, right) => right[1] - left[1]).map(([subjectName]) => subjectName);
-            const teacherSlots = slotTeacherLoads.get(teacher.id) ?? [];
-            const teacherTimeIndices = teacherSlots
-                .map((slot) => timeIndexMap.get(slot.timeLabel) ?? 0)
-                .filter((value) => value > 0);
-            const isAvailable = !teacherSlots.some((slot) => slot.timeLabel === targetSlot.timeLabel);
-            const { gapBefore, gapAfter } = computeGaps(teacherTimeIndices, targetSlotIndex);
+            const teacherSlots = teacher.scheduleSlots.filter((slot) => slot.dayOfWeek === targetSlot.dayOfWeek);
+            const teacherTimeIndices = teacherSlots.map((slot) => slot.slotIndex);
+            const isAvailable = !teacherSlots.some((slot) =>
+                slot.slotIndex === targetSlot.slotIndex && slot.durationSlots === targetSlot.durationSlots,
+            );
+            const { gapBefore, gapAfter } = computeGaps(teacherTimeIndices, targetSlot.slotIndex);
             const dailyLoad = teacherSlots.length;
-            const weeklyLoad = teacher.assignments.length * 5 + dailyLoad;
+            const weeklyLoad = teacher.assignments.length * 5 + teacher.scheduleSlots.length;
             const consecutiveLessonsToday = computeLongestRun(teacherTimeIndices);
-            const roomDistanceScore = inferRoomDistanceScore(targetSlot.room, teacherSlots.map((slot) => slot.room));
+            const roomDistanceScore = inferRoomDistanceScore(roomName, teacherSlots.map((slot) => slot.room?.name ?? ""));
             const recentSubstitutionsCount = clamp(Math.max(0, dailyLoad - 2), 0, 5);
             const burnoutRiskScore = clamp(dailyLoad / 8 * 0.4 + weeklyLoad / 30 * 0.35 + consecutiveLessonsToday / 5 * 0.25, 0.1, 0.95);
             const scheduleDisruptionScore = clamp(
@@ -411,24 +379,33 @@ export async function getScheduleSubstituteMatches(planId?: string): Promise<Sub
     return {
         absentTeacher: {
             teacherId: targetSlot.teacher.id,
-            teacherName,
+            teacherName: targetSlot.teacher.user.fullName,
         },
         lesson: {
             slotId: targetSlot.id,
             subjectName: targetSlot.subject.name,
             className: targetSlot.schoolClass.name,
             timeLabel: targetSlot.timeLabel,
-            room: targetSlot.room,
+            room: roomName,
         },
         candidates: ranked.map((candidate) => ({
             ...candidate,
-            candidate_secondary_specialization:
-                candidate.candidate_secondary_specialization === "None"
-                    ? null
-                    : candidate.candidate_secondary_specialization,
             teacherName: teacherMap.get(candidate.candidate_teacher_id) ?? candidate.candidate_teacher_id,
             availability: (candidates.find((item) => item.candidate_teacher_id === candidate.candidate_teacher_id)?.candidate_is_available ?? 0) === 1,
         })),
         source,
-    };
+    } satisfies SubstituteMatchSummary;
+}
+
+export async function getScheduleSubstituteMatches(planId?: string): Promise<SubstituteMatchSummary | null> {
+    const activeAbsence = await prisma.teacherAbsence.findFirst({
+        where: { status: TeacherAbsenceStatus.active },
+        orderBy: { startsAt: "asc" },
+    });
+    if (!activeAbsence) return null;
+
+    return buildSubstituteMatchSummary({
+        planId,
+        teacherId: activeAbsence.teacherId,
+    });
 }

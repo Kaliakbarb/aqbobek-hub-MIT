@@ -74,12 +74,6 @@ function stdDev(values: number[]) {
     return Math.sqrt(variance);
 }
 
-function parseStartMinutes(timeLabel: string) {
-    const match = timeLabel.match(/(\d{1,2}):(\d{2})/);
-    if (!match) return Number.MAX_SAFE_INTEGER;
-    return Number(match[1]) * 60 + Number(match[2]);
-}
-
 function computeGapStats(indices: number[]) {
     if (indices.length === 0) {
         return { gaps: 0, longestRun: 0 };
@@ -202,6 +196,7 @@ async function loadSchedulePlan(planId?: string) {
                     schoolClass: true,
                     subject: true,
                     teacher: true,
+                    room: true,
                 },
             },
             conflicts: true,
@@ -215,9 +210,9 @@ function deriveMetricsFromPlan(
     totalTeacherCount: number,
 ): ScheduleQualityModelInput {
     const slots = plan.slots;
-    const uniqueTimes = [...new Set(slots.map((slot) => slot.timeLabel))].sort((left, right) => parseStartMinutes(left) - parseStartMinutes(right));
-    const timeIndexMap = new Map(uniqueTimes.map((timeLabel, index) => [timeLabel, index]));
-    const uniqueRooms = [...new Set(slots.map((slot) => slot.room.trim()))];
+    const uniqueTimes = [...new Set(slots.map((slot) => slot.slotIndex))].sort((left, right) => left - right);
+    const timeIndexMap = new Map(uniqueTimes.map((slotIndex, index) => [slotIndex, index]));
+    const uniqueRooms = [...new Set(slots.map((slot) => slot.room?.name?.trim()).filter(Boolean) as string[])];
 
     const teacherSlots = new Map<string, number[]>();
     const classSlots = new Map<string, typeof slots>();
@@ -225,9 +220,10 @@ function deriveMetricsFromPlan(
     const teacherTimeCounts = new Map<string, number>();
     const classTimeCounts = new Map<string, number>();
     const subjectTimeCounts = new Map<string, number>();
+    const classDayLoads = new Map<string, number>();
 
     for (const slot of slots) {
-        const timeIndex = timeIndexMap.get(slot.timeLabel) ?? 0;
+        const timeIndex = timeIndexMap.get(slot.slotIndex) ?? 0;
         if (slot.teacherId) {
             const teacherIndices = teacherSlots.get(slot.teacherId) ?? [];
             teacherIndices.push(timeIndex);
@@ -238,19 +234,26 @@ function deriveMetricsFromPlan(
         classEntries.push(slot);
         classSlots.set(slot.classId, classEntries);
 
-        const roomKey = `${slot.room}__${slot.timeLabel}`;
-        roomTimeCounts.set(roomKey, (roomTimeCounts.get(roomKey) ?? 0) + 1);
+        if (slot.room?.name) {
+            const roomKey = `${slot.room.name}__${slot.dayOfWeek}__${slot.slotIndex}`;
+            roomTimeCounts.set(roomKey, (roomTimeCounts.get(roomKey) ?? 0) + 1);
+        }
 
         if (slot.teacherId) {
-            const teacherKey = `${slot.teacherId}__${slot.timeLabel}`;
+            const teacherKey = `${slot.teacherId}__${slot.dayOfWeek}__${slot.slotIndex}`;
             teacherTimeCounts.set(teacherKey, (teacherTimeCounts.get(teacherKey) ?? 0) + 1);
         }
 
-        const classKey = `${slot.classId}__${slot.timeLabel}`;
+        const classKey = `${slot.classId}__${slot.dayOfWeek}__${slot.slotIndex}`;
         classTimeCounts.set(classKey, (classTimeCounts.get(classKey) ?? 0) + 1);
 
-        const subjectTimeKey = `${slot.subjectId}__${slot.timeLabel}`;
-        subjectTimeCounts.set(subjectTimeKey, (subjectTimeCounts.get(subjectTimeKey) ?? 0) + 1);
+        if (slot.subjectId) {
+            const subjectTimeKey = `${slot.subjectId}__${slot.dayOfWeek}__${slot.slotIndex}`;
+            subjectTimeCounts.set(subjectTimeKey, (subjectTimeCounts.get(subjectTimeKey) ?? 0) + 1);
+        }
+
+        const classDayKey = `${slot.classId}__${slot.dayOfWeek}`;
+        classDayLoads.set(classDayKey, (classDayLoads.get(classDayKey) ?? 0) + slot.durationSlots);
     }
 
     const teacherGapStats = [...teacherSlots.values()].map((indices) => {
@@ -259,11 +262,14 @@ function deriveMetricsFromPlan(
     });
 
     const classHardRuns = [...classSlots.values()].map((classSchedule) => {
-        const ordered = [...classSchedule].sort((left, right) => (timeIndexMap.get(left.timeLabel) ?? 0) - (timeIndexMap.get(right.timeLabel) ?? 0));
+        const ordered = [...classSchedule].sort((left, right) => {
+            if (left.dayOfWeek !== right.dayOfWeek) return left.dayOfWeek - right.dayOfWeek;
+            return (timeIndexMap.get(left.slotIndex) ?? 0) - (timeIndexMap.get(right.slotIndex) ?? 0);
+        });
         let currentRun = 0;
         let longestRun = 0;
         for (const slot of ordered) {
-            if (HARD_SUBJECTS.has(slot.subject.name)) {
+            if (slot.subject && HARD_SUBJECTS.has(slot.subject.name)) {
                 currentRun += 1;
                 longestRun = Math.max(longestRun, currentRun);
             } else {
@@ -274,6 +280,7 @@ function deriveMetricsFromPlan(
     });
 
     const classLoads = [...classSlots.values()].map((classSchedule) => classSchedule.length);
+    const classDailyLoads = [...classDayLoads.values()];
     const teacherLoads = [...teacherSlots.values()].map((indices) => indices.length);
     const roomConflictCount = [...roomTimeCounts.values()].reduce((sum, count) => sum + Math.max(0, count - 1), 0);
     const teacherConflictCount = [...teacherTimeCounts.values()].reduce((sum, count) => sum + Math.max(0, count - 1), 0);
@@ -289,8 +296,8 @@ function deriveMetricsFromPlan(
     const maxTeacherConsecutive = Math.max(0, ...teacherGapStats.map((item) => item.longestRun));
     const avgStudentHardConsecutive = average(classHardRuns);
     const maxStudentHardConsecutive = Math.max(0, ...classHardRuns);
-    const avgStudentDailyLoad = average(classLoads);
-    const maxStudentDailyLoad = Math.max(0, ...classLoads);
+    const avgStudentDailyLoad = average(classDailyLoads);
+    const maxStudentDailyLoad = Math.max(0, ...classDailyLoads);
     const teacherWorkloadStd = stdDev(teacherLoads);
     const classWorkloadStd = stdDev(classLoads);
     const scheduleBalanceScore = clamp(1 - classWorkloadStd / 4.5, 0, 1);
@@ -298,13 +305,13 @@ function deriveMetricsFromPlan(
     const lateThreshold = Math.max(0, uniqueTimes.length - Math.ceil(uniqueTimes.length / 4));
     const earlyThreshold = Math.max(1, Math.ceil(uniqueTimes.length / 4));
     const lateSlotUsageRate = slots.length > 0
-        ? clamp(slots.filter((slot) => (timeIndexMap.get(slot.timeLabel) ?? 0) >= lateThreshold).length / slots.length, 0, 1)
+        ? clamp(slots.filter((slot) => (timeIndexMap.get(slot.slotIndex) ?? 0) >= lateThreshold).length / slots.length, 0, 1)
         : 0;
     const earlySlotUsageRate = slots.length > 0
-        ? clamp(slots.filter((slot) => (timeIndexMap.get(slot.timeLabel) ?? 0) < earlyThreshold).length / slots.length, 0, 1)
+        ? clamp(slots.filter((slot) => (timeIndexMap.get(slot.slotIndex) ?? 0) < earlyThreshold).length / slots.length, 0, 1)
         : 0;
     const totalParallelStreams = [...subjectTimeCounts.values()].filter((count) => count > 1).length;
-    const lunchBreakViolationCount = classLoads.filter((load) => load > 4).length;
+    const lunchBreakViolationCount = classDailyLoads.filter((load) => load > 5).length;
     const streamComplexityScore = clamp(
         (slots.length > 0 ? slots.filter((slot) => slot.split).length / slots.length : 0) * 0.5 +
         clamp(totalParallelStreams / Math.max(uniqueTimes.length, 1), 0, 1) * 0.5,
@@ -331,8 +338,14 @@ function deriveMetricsFromPlan(
         0.1,
         1,
     );
-    const fridayOverloadScore = plan.dayOfWeek === 5 ? clamp(avgStudentDailyLoad / 8, 0, 1) : 0;
-    const mondayUnderloadScore = plan.dayOfWeek === 1 ? clamp((5 - avgStudentDailyLoad) / 5, 0, 1) : 0;
+    const fridayLoads = [...classDayLoads.entries()]
+        .filter(([key]) => key.endsWith("__5"))
+        .map(([, load]) => load);
+    const mondayLoads = [...classDayLoads.entries()]
+        .filter(([key]) => key.endsWith("__1"))
+        .map(([, load]) => load);
+    const fridayOverloadScore = clamp(average(fridayLoads) / 8, 0, 1);
+    const mondayUnderloadScore = clamp((5 - average(mondayLoads)) / 5, 0, 1);
     const reoptimizationNeededFlag: 0 | 1 =
         roomConflictCount > 0 ||
         teacherConflictCount > 0 ||
@@ -351,7 +364,7 @@ function deriveMetricsFromPlan(
         total_subject_blocks: slots.length,
         total_group_lessons: slots.filter((slot) => slot.split).length,
         total_parallel_streams: totalParallelStreams,
-        total_events: plan.conflicts.length,
+        total_events: slots.filter((slot) => slot.itemType === "event" || slot.itemType === "academicHour").length,
         avg_teacher_gaps_per_week: round(avgTeacherGaps),
         max_teacher_gaps: maxTeacherGaps,
         avg_teacher_consecutive_lessons: round(avgTeacherConsecutive),

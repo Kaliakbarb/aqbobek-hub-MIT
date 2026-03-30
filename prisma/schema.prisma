@@ -50,11 +50,52 @@ enum BroadcastAudienceType {
   all
   role
   class
+  user
 }
 
 enum SchedulePlanStatus {
   draft
   published
+}
+
+enum ScheduleGenerationMode {
+  initial
+  reoptimized
+}
+
+enum RoomType {
+  standard
+  lab
+  computer
+  lecture
+  gym
+  outdoor
+  hall
+}
+
+enum AvailabilityStatus {
+  available
+  unavailable
+}
+
+enum ScheduleItemType {
+  lesson
+  pair
+  academicHour
+  event
+  band
+}
+
+enum ScheduleSlotSourceType {
+  generated
+  substitute
+  reoptimized
+  manual
+}
+
+enum TeacherAbsenceStatus {
+  active
+  resolved
 }
 
 enum EventLogKind {
@@ -79,6 +120,12 @@ enum ChatRole {
   user
 }
 
+enum HomeworkSubmissionStatus {
+  draft
+  submitted
+  reviewed
+}
+
 model User {
   id           String       @id @default(cuid())
   username     String       @unique
@@ -99,6 +146,7 @@ model User {
   parentLinks     ParentStudent[]        @relation("ParentLinks")
   createdNews     NewsItem[]             @relation("NewsAuthor")
   broadcasts      Broadcast[]            @relation("BroadcastAuthor")
+  targetedBroadcasts Broadcast[]         @relation("BroadcastTargetUser")
   approvalsDecided Approval[]            @relation("ApprovalDecisionBy")
   incidentsOwned  Incident[]             @relation("IncidentOwner")
   eventLogs       EventLog[]
@@ -129,8 +177,11 @@ model SchoolClass {
   students           Student[]
   teachingAssignments TeachingAssignment[]
   scheduleSlots      ScheduleSlot[]
+  scheduleRequirements ScheduleRequirement[]
+  scheduleBandMembers ScheduleBandMember[]
   newsItems          NewsItem[]
   broadcasts         Broadcast[]
+  homeworkAssignments HomeworkAssignment[]
 }
 
 model Subject {
@@ -143,7 +194,10 @@ model Subject {
   attendanceRecords  AttendanceRecord[]
   teachingAssignments TeachingAssignment[]
   scheduleSlots      ScheduleSlot[]
+  scheduleRequirements ScheduleRequirement[]
+  scheduleBandMembers ScheduleBandMember[]
   riskAlerts         RiskAlert[]
+  homeworkAssignments HomeworkAssignment[]
 }
 
 model Student {
@@ -171,6 +225,7 @@ model Student {
   leaderboardEntries LeaderboardEntry[]
   badges           StudentBadge[]
   parentLinks      ParentStudent[]   @relation("StudentLinks")
+  homeworkSubmissions HomeworkSubmission[]
 }
 
 model Teacher {
@@ -183,7 +238,27 @@ model Teacher {
   user        User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   assignments TeachingAssignment[]
   tasks       TeacherTask[]
+  scheduleSlots ScheduleSlot[]     @relation("CurrentScheduleTeacher")
+  originalScheduleSlots ScheduleSlot[] @relation("OriginalScheduleTeacher")
+  availabilities TeacherAvailability[]
+  absences    TeacherAbsence[]
+  scheduleRequirements ScheduleRequirement[]
+  scheduleBandMembers ScheduleBandMember[]
+  homeworkAssignments HomeworkAssignment[]
+}
+
+model Room {
+  id          String             @id @default(cuid())
+  name        String             @unique
+  type        RoomType
+  capacity    Int                @default(25)
+  active      Boolean            @default(true)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  availabilities RoomAvailability[]
   scheduleSlots ScheduleSlot[]
+  bandMembers  ScheduleBandMember[]
 }
 
 model ParentStudent {
@@ -210,6 +285,44 @@ model TeachingAssignment {
   schoolClass SchoolClass @relation(fields: [classId], references: [id], onDelete: Cascade)
 
   @@unique([teacherId, subjectId, classId])
+}
+
+model HomeworkAssignment {
+  id          String                   @id @default(cuid())
+  classId     String
+  subjectId   String?
+  teacherId   String?
+  title       String
+  description String
+  dueAt       DateTime
+  active      Boolean                  @default(true)
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
+
+  schoolClass SchoolClass              @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subject     Subject?                 @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  teacher     Teacher?                 @relation(fields: [teacherId], references: [id], onDelete: SetNull)
+  submissions HomeworkSubmission[]
+}
+
+model HomeworkSubmission {
+  id                 String                   @id @default(cuid())
+  assignmentId       String
+  studentId          String
+  status             HomeworkSubmissionStatus @default(draft)
+  note               String?
+  fileName           String?
+  fileUrl            String?
+  submittedAt        DateTime?
+  reviewedAt         DateTime?
+  teacherFeedback    String?
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+
+  assignment         HomeworkAssignment       @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  student            Student                  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([assignmentId, studentId])
 }
 
 model Grade {
@@ -320,8 +433,11 @@ model TeacherTask {
 model SchedulePlan {
   id          String             @id @default(cuid())
   title       String
-  dayOfWeek   Int
+  weekStartDate DateTime
   status      SchedulePlanStatus @default(draft)
+  generationMode ScheduleGenerationMode @default(initial)
+  regenerationReason String?
+  basedOnPlanId String?
   generatedAt DateTime           @default(now())
   publishedAt DateTime?
   createdById String?
@@ -329,25 +445,40 @@ model SchedulePlan {
   updatedAt   DateTime           @updatedAt
 
   createdBy   User?              @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  basedOnPlan SchedulePlan?      @relation("SchedulePlanDerivation", fields: [basedOnPlanId], references: [id], onDelete: SetNull)
+  derivedPlans SchedulePlan[]    @relation("SchedulePlanDerivation")
   slots       ScheduleSlot[]
   conflicts   ScheduleConflict[]
+  triggeredAbsences TeacherAbsence[]
 }
 
 model ScheduleSlot {
   id             String       @id @default(cuid())
   schedulePlanId String
   classId        String
-  subjectId      String
+  subjectId      String?
   teacherId      String?
+  originalTeacherId String?
+  roomId         String?
+  dayOfWeek      Int
+  slotIndex      Int
+  durationSlots  Int          @default(1)
+  itemType       ScheduleItemType @default(lesson)
+  title          String?
   timeLabel      String
-  room           String
   split          Boolean      @default(false)
+  sourceType     ScheduleSlotSourceType @default(generated)
+  locked         Boolean      @default(false)
+  bandId         String?
   createdAt      DateTime     @default(now())
 
   schedulePlan   SchedulePlan @relation(fields: [schedulePlanId], references: [id], onDelete: Cascade)
   schoolClass    SchoolClass  @relation(fields: [classId], references: [id], onDelete: Cascade)
-  subject        Subject      @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-  teacher        Teacher?     @relation(fields: [teacherId], references: [id], onDelete: SetNull)
+  subject        Subject?     @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  teacher        Teacher?     @relation("CurrentScheduleTeacher", fields: [teacherId], references: [id], onDelete: SetNull)
+  originalTeacher Teacher?    @relation("OriginalScheduleTeacher", fields: [originalTeacherId], references: [id], onDelete: SetNull)
+  room           Room?        @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  band           ScheduleBand? @relation(fields: [bandId], references: [id], onDelete: SetNull)
 }
 
 model ScheduleConflict {
@@ -357,9 +488,108 @@ model ScheduleConflict {
   description    String
   severity       String
   resolved       Boolean      @default(true)
+  needsAttention Boolean      @default(false)
   createdAt      DateTime     @default(now())
 
   schedulePlan   SchedulePlan @relation(fields: [schedulePlanId], references: [id], onDelete: Cascade)
+}
+
+model TeacherAvailability {
+  id          String             @id @default(cuid())
+  teacherId   String
+  dayOfWeek   Int
+  slotIndex   Int
+  status      AvailabilityStatus @default(available)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  teacher     Teacher            @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  @@unique([teacherId, dayOfWeek, slotIndex])
+}
+
+model RoomAvailability {
+  id          String             @id @default(cuid())
+  roomId      String
+  dayOfWeek   Int
+  slotIndex   Int
+  status      AvailabilityStatus @default(available)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  room        Room               @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, dayOfWeek, slotIndex])
+}
+
+model ScheduleBand {
+  id            String              @id @default(cuid())
+  title         String
+  unitsPerWeek  Int                 @default(1)
+  durationSlots Int                 @default(1)
+  itemType      ScheduleItemType    @default(band)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  members       ScheduleBandMember[]
+  requirements  ScheduleRequirement[]
+  slots         ScheduleSlot[]
+}
+
+model ScheduleBandMember {
+  id          String    @id @default(cuid())
+  bandId      String
+  classId     String
+  subjectId   String?
+  teacherId   String?
+  roomId      String?
+  label       String?
+  title       String?
+  createdAt   DateTime  @default(now())
+
+  band        ScheduleBand  @relation(fields: [bandId], references: [id], onDelete: Cascade)
+  schoolClass SchoolClass   @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subject     Subject?      @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  teacher     Teacher?      @relation(fields: [teacherId], references: [id], onDelete: SetNull)
+  room        Room?         @relation(fields: [roomId], references: [id], onDelete: SetNull)
+}
+
+model ScheduleRequirement {
+  id               String           @id @default(cuid())
+  classId          String
+  subjectId        String?
+  teacherId        String?
+  bandId           String?
+  title            String?
+  unitsPerWeek     Int
+  durationSlots    Int              @default(1)
+  itemType         ScheduleItemType @default(lesson)
+  roomTypeRequired RoomType?
+  difficulty       Int              @default(1)
+  lockedDayOfWeek  Int?
+  lockedSlotIndex  Int?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  schoolClass      SchoolClass      @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subject          Subject?         @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  teacher          Teacher?         @relation(fields: [teacherId], references: [id], onDelete: SetNull)
+  band             ScheduleBand?    @relation(fields: [bandId], references: [id], onDelete: SetNull)
+}
+
+model TeacherAbsence {
+  id             String               @id @default(cuid())
+  teacherId      String
+  startsAt       DateTime
+  endsAt         DateTime
+  reason         String
+  status         TeacherAbsenceStatus @default(active)
+  triggeredPlanId String?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  teacher        Teacher              @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  triggeredPlan  SchedulePlan?        @relation(fields: [triggeredPlanId], references: [id], onDelete: SetNull)
 }
 
 model LeaderboardEntry {
@@ -415,10 +645,12 @@ model Broadcast {
   createdByUserId String?
   targetRole     UserRole?
   targetClassId  String?
+  targetUserId   String?
   createdAt      DateTime             @default(now())
 
   createdBy      User?                @relation("BroadcastAuthor", fields: [createdByUserId], references: [id], onDelete: SetNull)
   targetClass    SchoolClass?         @relation(fields: [targetClassId], references: [id], onDelete: SetNull)
+  targetUser     User?                @relation("BroadcastTargetUser", fields: [targetUserId], references: [id], onDelete: SetNull)
 }
 
 model Approval {

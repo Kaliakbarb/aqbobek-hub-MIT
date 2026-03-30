@@ -8,7 +8,7 @@ import logo from "../logo.png";
 import type { AppRole } from "../lib/demo-auth";
 import {
     Menu, X, Home, BookOpen, Calendar,
-    Settings, Bell, LogOut, Award, Sparkles, Newspaper, Monitor, Shield
+    Settings, Bell, LogOut, Award, Sparkles, Newspaper, Monitor, Shield, Users
 } from "lucide-react";
 
 type SessionPayload = {
@@ -25,8 +25,14 @@ const navItems: Array<{
     icon: typeof Home;
     roles: AppRole[];
 }> = [
-    { href: "/student", label: "Профиль ученика", icon: Home, roles: ["student"] },
+    { href: "/student", label: "Кабинет ученика", icon: Home, roles: ["student"] },
+    { href: "/student/schedule", label: "Мое расписание", icon: Calendar, roles: ["student"] },
+    { href: "/student/homework", label: "Домашка", icon: BookOpen, roles: ["student"] },
+    { href: "/student/profile", label: "Портфолио", icon: Award, roles: ["student"] },
     { href: "/teacher", label: "Кабинет учителя", icon: BookOpen, roles: ["teacher"] },
+    { href: "/teacher/schedule", label: "Мое расписание", icon: Calendar, roles: ["teacher"] },
+    { href: "/teacher/classes", label: "Классы", icon: Users, roles: ["teacher"] },
+    { href: "/teacher/workbench", label: "Рабочий центр", icon: Sparkles, roles: ["teacher"] },
     { href: "/parent", label: "Кабинет родителя", icon: Home, roles: ["parent"] },
     { href: "/admin", label: "Администрация", icon: Shield, roles: ["admin"] },
     { href: "/admin/schedule", label: "Расписание", icon: Calendar, roles: ["admin"] },
@@ -63,7 +69,11 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         return navItems.filter((item) => item.roles.includes(session.role));
     }, [session]);
 
-    const activeLabel = visibleNavItems.find((item) => pathname === item.href)?.label || "Дашборд";
+    const activeItem = [...visibleNavItems]
+        .sort((left, right) => right.href.length - left.href.length)
+        .find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`));
+    const isNavItemActive = (href: string) => activeItem?.href === href;
+    const activeLabel = activeItem?.label || "Дашборд";
 
     const logout = async () => {
         setLoggingOut(true);
@@ -93,7 +103,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                 <nav className="flex-1 px-4 py-4 overflow-y-auto space-y-1">
                     {visibleNavItems.map((item) => {
                         const Icon = item.icon;
-                        const isActive = pathname === item.href;
+                        const isActive = isNavItemActive(item.href);
                         return (
                             <Link
                                 key={item.href}
@@ -135,7 +145,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                         <nav className="flex-1 px-4 py-4 overflow-y-auto space-y-1">
                             {visibleNavItems.map((item) => {
                                 const Icon = item.icon;
-                                const isActive = pathname === item.href;
+                                const isActive = isNavItemActive(item.href);
                                 return (
                                     <Link
                                         key={item.href}

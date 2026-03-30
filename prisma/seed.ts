@@ -4,24 +4,45 @@ import bcrypt from "bcryptjs";
 import {
     ApprovalStatus,
     AttendanceStatus,
+    AvailabilityStatus,
     BroadcastAudienceType,
     ChatRole,
     EventLogKind,
+    HomeworkSubmissionStatus,
     IncidentStatus,
     KioskItemType,
     NewsCategory,
     PrismaClient,
+    RoomType,
     RiskLevel,
+    ScheduleItemType,
     SchedulePlanStatus,
+    TeacherAbsenceStatus,
     UserRole,
 } from "@prisma/client";
+import { generateSmartSchedule } from "../lib/smart-schedule";
 
 const prisma = new PrismaClient({
     adapter: new PrismaBetterSqlite3({ url: process.env.DATABASE_URL || "file:./dev.db" }),
 });
 
+const EXTRA_STUDENTS_PER_CLASS = 20;
+const EXTRA_FIRST_NAMES = [
+    "Арман", "Диас", "Аяулым", "Нурасыл", "Мадина", "Санжар", "Алина", "Ерасыл", "Аружан", "Ислам",
+    "Мирас", "Томирис", "Еркежан", "Бекзат", "Жанель", "Адиль", "Сезим", "Расул", "Адель", "Нурсултан",
+];
+const EXTRA_LAST_NAMES = [
+    "Сатыбалдиев", "Омарова", "Тлеубергенов", "Ибраева", "Касымов", "Сагындык", "Нурпеисова", "Муратов", "Елубаева", "Калибеков",
+    "Абдрахманов", "Жумабекова", "Сағынтаев", "Турсынова", "Кудайберген", "Мусина", "Бекенов", "Даулетова", "Сулейменов", "Шарипова",
+];
+
+function round(value: number, digits = 1) {
+    return Number(value.toFixed(digits));
+}
+
 async function main() {
     const passwordHash = await bcrypt.hash("12345", 10);
+    const hiddenStudentPasswordHash = await bcrypt.hash("seed-only-hidden-students-2026", 10);
 
     await prisma.chatMessage.deleteMany();
     await prisma.kioskItem.deleteMany();
@@ -32,9 +53,18 @@ async function main() {
     await prisma.newsItem.deleteMany();
     await prisma.studentBadge.deleteMany();
     await prisma.leaderboardEntry.deleteMany();
+    await prisma.teacherAbsence.deleteMany();
     await prisma.scheduleConflict.deleteMany();
     await prisma.scheduleSlot.deleteMany();
     await prisma.schedulePlan.deleteMany();
+    await prisma.scheduleRequirement.deleteMany();
+    await prisma.scheduleBandMember.deleteMany();
+    await prisma.scheduleBand.deleteMany();
+    await prisma.roomAvailability.deleteMany();
+    await prisma.teacherAvailability.deleteMany();
+    await prisma.room.deleteMany();
+    await prisma.homeworkSubmission.deleteMany();
+    await prisma.homeworkAssignment.deleteMany();
     await prisma.teacherTask.deleteMany();
     await prisma.riskAlert.deleteMany();
     await prisma.activityEntry.deleteMany();
@@ -59,6 +89,11 @@ async function main() {
     ]);
 
     const classMap = Object.fromEntries(schoolClasses.map((item) => [item.name, item]));
+    const classProfileMap = {
+        "10 А": "Физико-математическое направление",
+        "10 Б": "Физико-математическое направление",
+        "10 В": "STEM",
+    } as const;
 
     const subjects = await Promise.all([
         "Алгебра",
@@ -156,6 +191,71 @@ async function main() {
         }),
         prisma.user.create({
             data: {
+                username: "teacher4",
+                passwordHash,
+                role: UserRole.teacher,
+                firstName: "А.Н.",
+                lastName: "Ким",
+                fullName: "Ким А.Н.",
+                email: "teacher4@aqbobek.kz",
+                homePath: "/teacher",
+                settings: { create: {} },
+            },
+        }),
+        prisma.user.create({
+            data: {
+                username: "teacher5",
+                passwordHash,
+                role: UserRole.teacher,
+                firstName: "Е.В.",
+                lastName: "Петрова",
+                fullName: "Петрова Е.В.",
+                email: "teacher5@aqbobek.kz",
+                homePath: "/teacher",
+                settings: { create: {} },
+            },
+        }),
+        prisma.user.create({
+            data: {
+                username: "teacher6",
+                passwordHash,
+                role: UserRole.teacher,
+                firstName: "Ж.К.",
+                lastName: "Серикова",
+                fullName: "Серикова Ж.К.",
+                email: "teacher6@aqbobek.kz",
+                homePath: "/teacher",
+                settings: { create: {} },
+            },
+        }),
+        prisma.user.create({
+            data: {
+                username: "teacher7",
+                passwordHash,
+                role: UserRole.teacher,
+                firstName: "И.А.",
+                lastName: "Орлов",
+                fullName: "Орлов И.А.",
+                email: "teacher7@aqbobek.kz",
+                homePath: "/teacher",
+                settings: { create: {} },
+            },
+        }),
+        prisma.user.create({
+            data: {
+                username: "teacher8",
+                passwordHash,
+                role: UserRole.teacher,
+                firstName: "Л.С.",
+                lastName: "Баймуханова",
+                fullName: "Баймуханова Л.С.",
+                email: "teacher8@aqbobek.kz",
+                homePath: "/teacher",
+                settings: { create: {} },
+            },
+        }),
+        prisma.user.create({
+            data: {
                 username: "admin",
                 passwordHash,
                 role: UserRole.admin,
@@ -209,6 +309,56 @@ async function main() {
     ]);
 
     const userMap = Object.fromEntries(users.map((item) => [item.username, item]));
+    const extraStudentSpecs = (["10 А", "10 Б", "10 В"] as const).flatMap((className, classIndex) =>
+        Array.from({ length: EXTRA_STUDENTS_PER_CLASS }, (_, index) => {
+            const serial = classIndex * EXTRA_STUDENTS_PER_CLASS + index;
+            const firstName = EXTRA_FIRST_NAMES[serial % EXTRA_FIRST_NAMES.length];
+            const lastName = EXTRA_LAST_NAMES[(serial * 3) % EXTRA_LAST_NAMES.length];
+            const username = `background_${classIndex + 1}_${String(index + 1).padStart(2, "0")}`;
+            const gpa = round(3.5 + ((serial * 7) % 13) * 0.09, 1);
+            const homeworkPct = 70 + ((serial * 11) % 28);
+            const streakDays = 2 + ((serial * 5) % 19);
+
+            return {
+                username,
+                firstName,
+                lastName,
+                fullName: `${firstName} ${lastName}`,
+                email: `${username}@aqbobek.kz`,
+                className,
+                profileDirection: classProfileMap[className],
+                gpa,
+                homeworkPct,
+                streakDays,
+                overallPoints: 1080 + classIndex * 18 + (EXTRA_STUDENTS_PER_CLASS - index) * 10 + (serial % 4) * 7,
+                stemPoints: 760 + classIndex * 22 + (EXTRA_STUDENTS_PER_CLASS - index) * 8 + (serial % 5) * 6,
+                olympiadPoints: 430 + classIndex * 16 + (EXTRA_STUDENTS_PER_CLASS - index) * 5 + (serial % 6) * 4,
+            };
+        }),
+    );
+
+    const extraUsers = await Promise.all(
+        extraStudentSpecs.map((spec) =>
+            prisma.user.create({
+                data: {
+                    username: spec.username,
+                    passwordHash: hiddenStudentPasswordHash,
+                    role: UserRole.student,
+                    firstName: spec.firstName,
+                    lastName: spec.lastName,
+                    fullName: spec.fullName,
+                    email: spec.email,
+                    homePath: "/student",
+                    settings: {
+                        create: {
+                            pushAlerts: false,
+                            emailAlerts: false,
+                        },
+                    },
+                },
+            }),
+        ),
+    );
 
     const [student1, student2, student3] = await Promise.all([
         prisma.student.create({
@@ -218,8 +368,8 @@ async function main() {
                 profileDirection: "Физико-математическое направление",
                 gpa: 4.8,
                 homeworkPct: 94,
-                rank: 4,
-                rankTotal: 120,
+                rank: null,
+                rankTotal: null,
                 streakDays: 14,
             },
         }),
@@ -230,8 +380,8 @@ async function main() {
                 profileDirection: "Естественно-математическое направление",
                 gpa: 4.9,
                 homeworkPct: 97,
-                rank: 2,
-                rankTotal: 120,
+                rank: null,
+                rankTotal: null,
                 streakDays: 18,
             },
         }),
@@ -242,17 +392,39 @@ async function main() {
                 profileDirection: "STEM",
                 gpa: 4.7,
                 homeworkPct: 91,
-                rank: 5,
-                rankTotal: 120,
+                rank: null,
+                rankTotal: null,
                 streakDays: 10,
             },
         }),
     ]);
 
-    const [teacher1, teacher2, teacher3] = await Promise.all([
+    const extraStudents = await Promise.all(
+        extraUsers.map((user, index) =>
+            prisma.student.create({
+                data: {
+                    userId: user.id,
+                    classId: classMap[extraStudentSpecs[index].className].id,
+                    profileDirection: extraStudentSpecs[index].profileDirection,
+                    gpa: extraStudentSpecs[index].gpa,
+                    homeworkPct: extraStudentSpecs[index].homeworkPct,
+                    rank: null,
+                    rankTotal: null,
+                    streakDays: extraStudentSpecs[index].streakDays,
+                },
+            }),
+        ),
+    );
+
+    const [teacher1, teacher2, teacher3, teacher4, teacher5, teacher6, teacher7, teacher8] = await Promise.all([
         prisma.teacher.create({ data: { userId: userMap.teacher1.id, bio: "Физика, 10-11 классы" } }),
         prisma.teacher.create({ data: { userId: userMap.teacher2.id, bio: "Алгебра и геометрия" } }),
         prisma.teacher.create({ data: { userId: userMap.teacher3.id, bio: "История Казахстана" } }),
+        prisma.teacher.create({ data: { userId: userMap.teacher4.id, bio: "Английский язык, разговорные группы" } }),
+        prisma.teacher.create({ data: { userId: userMap.teacher5.id, bio: "Английский язык, профильные потоки" } }),
+        prisma.teacher.create({ data: { userId: userMap.teacher6.id, bio: "Химия и биология" } }),
+        prisma.teacher.create({ data: { userId: userMap.teacher7.id, bio: "Информатика" } }),
+        prisma.teacher.create({ data: { userId: userMap.teacher8.id, bio: "Физика и физкультура" } }),
     ]);
 
     await prisma.parentStudent.createMany({
@@ -275,13 +447,35 @@ async function main() {
     await prisma.teachingAssignment.createMany({
         data: [
             { teacherId: teacher2.id, subjectId: subjectMap["Алгебра"].id, classId: classMap["10 А"].id },
+            { teacherId: teacher2.id, subjectId: subjectMap["Геометрия"].id, classId: classMap["10 А"].id },
+            { teacherId: teacher7.id, subjectId: subjectMap["Информатика"].id, classId: classMap["10 А"].id },
+            { teacherId: teacher6.id, subjectId: subjectMap["Биология"].id, classId: classMap["10 А"].id },
+            { teacherId: teacher6.id, subjectId: subjectMap["Химия"].id, classId: classMap["10 А"].id },
             { teacherId: teacher2.id, subjectId: subjectMap["Геометрия"].id, classId: classMap["10 Б"].id },
+            { teacherId: teacher2.id, subjectId: subjectMap["Алгебра"].id, classId: classMap["10 Б"].id },
             { teacherId: teacher2.id, subjectId: subjectMap["Алгебра"].id, classId: classMap["10 В"].id },
+            { teacherId: teacher2.id, subjectId: subjectMap["Геометрия"].id, classId: classMap["10 В"].id },
             { teacherId: teacher1.id, subjectId: subjectMap["Физика"].id, classId: classMap["10 А"].id },
             { teacherId: teacher1.id, subjectId: subjectMap["Физика"].id, classId: classMap["10 Б"].id },
+            { teacherId: teacher8.id, subjectId: subjectMap["Физика"].id, classId: classMap["10 В"].id },
             { teacherId: teacher3.id, subjectId: subjectMap["История"].id, classId: classMap["10 А"].id },
             { teacherId: teacher3.id, subjectId: subjectMap["История Казахстана"].id, classId: classMap["10 А"].id },
+            { teacherId: teacher3.id, subjectId: subjectMap["История"].id, classId: classMap["10 Б"].id },
+            { teacherId: teacher3.id, subjectId: subjectMap["История Казахстана"].id, classId: classMap["10 Б"].id },
             { teacherId: teacher3.id, subjectId: subjectMap["История"].id, classId: classMap["10 В"].id },
+            { teacherId: teacher3.id, subjectId: subjectMap["История Казахстана"].id, classId: classMap["10 В"].id },
+            { teacherId: teacher4.id, subjectId: subjectMap["Английский язык"].id, classId: classMap["10 А"].id },
+            { teacherId: teacher5.id, subjectId: subjectMap["Английский язык"].id, classId: classMap["10 Б"].id },
+            { teacherId: teacher4.id, subjectId: subjectMap["Английский язык"].id, classId: classMap["10 В"].id },
+            { teacherId: teacher6.id, subjectId: subjectMap["Химия"].id, classId: classMap["10 Б"].id },
+            { teacherId: teacher6.id, subjectId: subjectMap["Биология"].id, classId: classMap["10 Б"].id },
+            { teacherId: teacher6.id, subjectId: subjectMap["Биология"].id, classId: classMap["10 В"].id },
+            { teacherId: teacher6.id, subjectId: subjectMap["Химия"].id, classId: classMap["10 В"].id },
+            { teacherId: teacher7.id, subjectId: subjectMap["Информатика"].id, classId: classMap["10 В"].id },
+            { teacherId: teacher7.id, subjectId: subjectMap["Информатика"].id, classId: classMap["10 Б"].id },
+            { teacherId: teacher8.id, subjectId: subjectMap["Физкультура"].id, classId: classMap["10 А"].id },
+            { teacherId: teacher8.id, subjectId: subjectMap["Физкультура"].id, classId: classMap["10 Б"].id },
+            { teacherId: teacher8.id, subjectId: subjectMap["Физкультура"].id, classId: classMap["10 В"].id },
         ],
     });
 
@@ -316,6 +510,95 @@ async function main() {
             { studentId: student1.id, title: "Сдать СОЧ по физике на 90+ баллов", daysLeft: 4 },
             { studentId: student2.id, title: "Подготовиться к городской олимпиаде по математике", daysLeft: 7 },
             { studentId: student3.id, title: "Улучшить результат по информатике до 95%", daysLeft: 10 },
+        ],
+    });
+
+    const [homeworkAlgebra10A, homeworkPhysics10A, homeworkInformatics10V, homeworkHistory10A] = await Promise.all([
+        prisma.homeworkAssignment.create({
+            data: {
+                classId: classMap["10 А"].id,
+                subjectId: subjectMap["Алгебра"].id,
+                teacherId: teacher2.id,
+                title: "Алгебра: квадратные уравнения",
+                description: "Решить №12-18, оформить полное решение и отметить один самый сложный пример.",
+                dueAt: new Date("2026-04-01T14:00:00Z"),
+            },
+        }),
+        prisma.homeworkAssignment.create({
+            data: {
+                classId: classMap["10 А"].id,
+                subjectId: subjectMap["Физика"].id,
+                teacherId: teacher1.id,
+                title: "Физика: электрическое поле",
+                description: "Подготовить конспект по теме и загрузить фото тетради с разбором 2 задач.",
+                dueAt: new Date("2026-04-02T14:00:00Z"),
+            },
+        }),
+        prisma.homeworkAssignment.create({
+            data: {
+                classId: classMap["10 В"].id,
+                subjectId: subjectMap["Информатика"].id,
+                teacherId: teacher7.id,
+                title: "Информатика: Python mini-project",
+                description: "Собрать маленькую консольную программу и приложить `.py` файл или архив с проектом.",
+                dueAt: new Date("2026-04-03T14:00:00Z"),
+            },
+        }),
+        prisma.homeworkAssignment.create({
+            data: {
+                classId: classMap["10 А"].id,
+                subjectId: subjectMap["История"].id,
+                teacherId: teacher3.id,
+                title: "История: карточки по реформам",
+                description: "Сделать 10 карточек с датами и короткими пояснениями, загрузить PDF или фото.",
+                dueAt: new Date("2026-04-04T14:00:00Z"),
+            },
+        }),
+    ]);
+
+    await prisma.homeworkSubmission.createMany({
+        data: [
+            {
+                assignmentId: homeworkAlgebra10A.id,
+                studentId: student1.id,
+                status: HomeworkSubmissionStatus.reviewed,
+                note: "Загрузил полное решение и отметил сложный номер 18.",
+                fileName: "algebra-10a-timur.pdf",
+                fileUrl: "/uploads/homework/demo/algebra-10a-timur.pdf",
+                submittedAt: new Date("2026-03-31T11:20:00Z"),
+                reviewedAt: new Date("2026-03-31T16:10:00Z"),
+                teacherFeedback: "Хорошее решение, но в №18 проверь дискриминант.",
+            },
+            {
+                assignmentId: homeworkPhysics10A.id,
+                studentId: student1.id,
+                status: HomeworkSubmissionStatus.draft,
+                note: "Черновик почти готов, осталось добавить фото второй задачи.",
+            },
+            {
+                assignmentId: homeworkPhysics10A.id,
+                studentId: student2.id,
+                status: HomeworkSubmissionStatus.submitted,
+                note: "Конспект и задачи приложены одним PDF.",
+                fileName: "physics-field-alisa.pdf",
+                fileUrl: "/uploads/homework/demo/physics-field-alisa.pdf",
+                submittedAt: new Date("2026-03-31T13:45:00Z"),
+            },
+            {
+                assignmentId: homeworkInformatics10V.id,
+                studentId: student3.id,
+                status: HomeworkSubmissionStatus.submitted,
+                note: "Сдала архив с python-проектом и README.",
+                fileName: "python-mini-project-damir.zip",
+                fileUrl: "/uploads/homework/demo/python-mini-project-damir.zip",
+                submittedAt: new Date("2026-03-31T12:15:00Z"),
+            },
+            {
+                assignmentId: homeworkHistory10A.id,
+                studentId: student2.id,
+                status: HomeworkSubmissionStatus.draft,
+                note: "Карточки готовы, осталось объединить фото в один файл.",
+            },
         ],
     });
 
@@ -379,55 +662,203 @@ async function main() {
         ],
     });
 
-    const schedulePlan = await prisma.schedulePlan.create({
+    const rooms = await Promise.all([
+        prisma.room.create({ data: { name: "301", type: RoomType.standard, capacity: 28 } }),
+        prisma.room.create({ data: { name: "302", type: RoomType.standard, capacity: 28 } }),
+        prisma.room.create({ data: { name: "304", type: RoomType.standard, capacity: 28 } }),
+        prisma.room.create({ data: { name: "205", type: RoomType.standard, capacity: 18 } }),
+        prisma.room.create({ data: { name: "206", type: RoomType.standard, capacity: 18 } }),
+        prisma.room.create({ data: { name: "210", type: RoomType.standard, capacity: 18 } }),
+        prisma.room.create({ data: { name: "Лаб. 1", type: RoomType.lab, capacity: 20 } }),
+        prisma.room.create({ data: { name: "Лаб. 3", type: RoomType.lab, capacity: 20 } }),
+        prisma.room.create({ data: { name: "Lab IT", type: RoomType.computer, capacity: 22 } }),
+        prisma.room.create({ data: { name: "Спортзал 1", type: RoomType.gym, capacity: 35 } }),
+        prisma.room.create({ data: { name: "Стадион", type: RoomType.outdoor, capacity: 60 } }),
+        prisma.room.create({ data: { name: "Актовый зал", type: RoomType.hall, capacity: 90 } }),
+    ]);
+    const roomMap = Object.fromEntries(rooms.map((room) => [room.name, room]));
+
+    await prisma.teacherAvailability.createMany({
+        data: [
+            { teacherId: teacher1.id, dayOfWeek: 3, slotIndex: 6, status: AvailabilityStatus.unavailable },
+            { teacherId: teacher2.id, dayOfWeek: 5, slotIndex: 1, status: AvailabilityStatus.unavailable },
+            { teacherId: teacher4.id, dayOfWeek: 2, slotIndex: 6, status: AvailabilityStatus.unavailable },
+            { teacherId: teacher5.id, dayOfWeek: 4, slotIndex: 1, status: AvailabilityStatus.unavailable },
+            { teacherId: teacher6.id, dayOfWeek: 1, slotIndex: 6, status: AvailabilityStatus.unavailable },
+            { teacherId: teacher7.id, dayOfWeek: 5, slotIndex: 6, status: AvailabilityStatus.unavailable },
+            { teacherId: teacher8.id, dayOfWeek: 3, slotIndex: 1, status: AvailabilityStatus.unavailable },
+        ],
+    });
+
+    await prisma.roomAvailability.createMany({
+        data: [
+            { roomId: roomMap["Актовый зал"].id, dayOfWeek: 4, slotIndex: 4, status: AvailabilityStatus.unavailable },
+            { roomId: roomMap["Стадион"].id, dayOfWeek: 2, slotIndex: 5, status: AvailabilityStatus.unavailable },
+            { roomId: roomMap["Лаб. 1"].id, dayOfWeek: 1, slotIndex: 6, status: AvailabilityStatus.unavailable },
+        ],
+    });
+
+    const englishBand = await prisma.scheduleBand.create({
         data: {
-            title: "Понедельник, 10 классы",
-            dayOfWeek: 1,
-            status: SchedulePlanStatus.published,
-            generatedAt: new Date("2026-03-29T07:00:00Z"),
-            publishedAt: new Date("2026-03-29T07:10:00Z"),
-            createdById: userMap.admin.id,
+            title: "Английский поток 10А/10Б",
+            unitsPerWeek: 2,
+            durationSlots: 1,
+            itemType: ScheduleItemType.band,
+            members: {
+                create: [
+                    {
+                        classId: classMap["10 А"].id,
+                        subjectId: subjectMap["Английский язык"].id,
+                        teacherId: teacher4.id,
+                        roomId: roomMap["205"].id,
+                        label: "10А • Group A",
+                    },
+                    {
+                        classId: classMap["10 Б"].id,
+                        subjectId: subjectMap["Английский язык"].id,
+                        teacherId: teacher5.id,
+                        roomId: roomMap["206"].id,
+                        label: "10Б • Group B",
+                    },
+                ],
+            },
         },
     });
 
-    await prisma.scheduleSlot.createMany({
+    await prisma.scheduleRequirement.createMany({
         data: [
-            { schedulePlanId: schedulePlan.id, classId: classMap["10 А"].id, subjectId: subjectMap["Алгебра"].id, teacherId: teacher2.id, timeLabel: "08:30 - 09:15", room: "302" },
-            { schedulePlanId: schedulePlan.id, classId: classMap["10 А"].id, subjectId: subjectMap["Физика"].id, teacherId: teacher1.id, timeLabel: "09:25 - 10:10", room: "Лаб. 3" },
-            { schedulePlanId: schedulePlan.id, classId: classMap["10 А"].id, subjectId: subjectMap["Английский язык"].id, timeLabel: "10:30 - 11:15", room: "205, 206", split: true },
-            { schedulePlanId: schedulePlan.id, classId: classMap["10 А"].id, subjectId: subjectMap["История"].id, teacherId: teacher3.id, timeLabel: "11:25 - 12:10", room: "310" },
-            { schedulePlanId: schedulePlan.id, classId: classMap["10 А"].id, subjectId: subjectMap["Физкультура"].id, timeLabel: "12:20 - 13:05", room: "Спортзал 1" },
-            { schedulePlanId: schedulePlan.id, classId: classMap["10 Б"].id, subjectId: subjectMap["Геометрия"].id, teacherId: teacher2.id, timeLabel: "08:30 - 09:15", room: "304" },
-            { schedulePlanId: schedulePlan.id, classId: classMap["10 Б"].id, subjectId: subjectMap["Физика"].id, teacherId: teacher1.id, timeLabel: "09:25 - 10:10", room: "Лаб. 3" },
-            { schedulePlanId: schedulePlan.id, classId: classMap["10 Б"].id, subjectId: subjectMap["Английский язык"].id, timeLabel: "10:30 - 11:15", room: "205, 207", split: true },
-            { schedulePlanId: schedulePlan.id, classId: classMap["10 Б"].id, subjectId: subjectMap["Химия"].id, timeLabel: "11:25 - 12:10", room: "Лаб. 1" },
-            { schedulePlanId: schedulePlan.id, classId: classMap["10 Б"].id, subjectId: subjectMap["Физкультура"].id, timeLabel: "12:20 - 13:05", room: "Стадион" },
-            { schedulePlanId: schedulePlan.id, classId: classMap["10 В"].id, subjectId: subjectMap["Алгебра"].id, teacherId: teacher2.id, timeLabel: "08:30 - 09:15", room: "301" },
-            { schedulePlanId: schedulePlan.id, classId: classMap["10 В"].id, subjectId: subjectMap["Биология"].id, timeLabel: "09:25 - 10:10", room: "204" },
-            { schedulePlanId: schedulePlan.id, classId: classMap["10 В"].id, subjectId: subjectMap["Английский язык"].id, timeLabel: "10:30 - 11:15", room: "210" },
-            { schedulePlanId: schedulePlan.id, classId: classMap["10 В"].id, subjectId: subjectMap["История"].id, teacherId: teacher3.id, timeLabel: "11:25 - 12:10", room: "310" },
-            { schedulePlanId: schedulePlan.id, classId: classMap["10 В"].id, subjectId: subjectMap["Информатика"].id, timeLabel: "12:20 - 13:05", room: "Lab IT" },
+            { classId: classMap["10 А"].id, subjectId: subjectMap["Алгебра"].id, teacherId: teacher2.id, unitsPerWeek: 3, durationSlots: 1, itemType: ScheduleItemType.lesson, roomTypeRequired: RoomType.standard, difficulty: 5 },
+            { classId: classMap["10 А"].id, subjectId: subjectMap["Геометрия"].id, teacherId: teacher2.id, unitsPerWeek: 2, durationSlots: 1, itemType: ScheduleItemType.lesson, roomTypeRequired: RoomType.standard, difficulty: 4 },
+            { classId: classMap["10 А"].id, subjectId: subjectMap["Физика"].id, teacherId: teacher1.id, unitsPerWeek: 1, durationSlots: 2, itemType: ScheduleItemType.pair, roomTypeRequired: RoomType.lab, difficulty: 5 },
+            { classId: classMap["10 А"].id, subjectId: subjectMap["История"].id, teacherId: teacher3.id, unitsPerWeek: 1, durationSlots: 1, itemType: ScheduleItemType.lesson, roomTypeRequired: RoomType.standard, difficulty: 3 },
+            { classId: classMap["10 А"].id, subjectId: subjectMap["История Казахстана"].id, teacherId: teacher3.id, unitsPerWeek: 1, durationSlots: 1, itemType: ScheduleItemType.lesson, roomTypeRequired: RoomType.standard, difficulty: 2 },
+            { classId: classMap["10 А"].id, subjectId: subjectMap["Информатика"].id, teacherId: teacher7.id, unitsPerWeek: 2, durationSlots: 1, itemType: ScheduleItemType.lesson, roomTypeRequired: RoomType.computer, difficulty: 4 },
+            { classId: classMap["10 А"].id, subjectId: subjectMap["Биология"].id, teacherId: teacher6.id, unitsPerWeek: 1, durationSlots: 1, itemType: ScheduleItemType.lesson, roomTypeRequired: RoomType.lab, difficulty: 3 },
+            { classId: classMap["10 А"].id, subjectId: subjectMap["Химия"].id, teacherId: teacher6.id, unitsPerWeek: 2, durationSlots: 1, itemType: ScheduleItemType.lesson, roomTypeRequired: RoomType.lab, difficulty: 3 },
+            { classId: classMap["10 А"].id, subjectId: subjectMap["Физкультура"].id, teacherId: teacher8.id, unitsPerWeek: 2, durationSlots: 1, itemType: ScheduleItemType.lesson, roomTypeRequired: RoomType.gym, difficulty: 1 },
+            { classId: classMap["10 А"].id, title: "Классный час", teacherId: teacher3.id, unitsPerWeek: 1, durationSlots: 1, itemType: ScheduleItemType.academicHour, roomTypeRequired: RoomType.standard, difficulty: 1, lockedDayOfWeek: 5, lockedSlotIndex: 5 },
+            { classId: classMap["10 А"].id, title: "Проектная мастерская", teacherId: teacher7.id, unitsPerWeek: 1, durationSlots: 1, itemType: ScheduleItemType.academicHour, roomTypeRequired: RoomType.computer, difficulty: 2 },
+
+            { classId: classMap["10 Б"].id, subjectId: subjectMap["Алгебра"].id, teacherId: teacher2.id, unitsPerWeek: 2, durationSlots: 1, itemType: ScheduleItemType.lesson, roomTypeRequired: RoomType.standard, difficulty: 5 },
+            { classId: classMap["10 Б"].id, subjectId: subjectMap["Геометрия"].id, teacherId: teacher2.id, unitsPerWeek: 3, durationSlots: 1, itemType: ScheduleItemType.lesson, roomTypeRequired: RoomType.standard, difficulty: 4 },
+            { classId: classMap["10 Б"].id, subjectId: subjectMap["Физика"].id, teacherId: teacher1.id, unitsPerWeek: 1, durationSlots: 2, itemType: ScheduleItemType.pair, roomTypeRequired: RoomType.lab, difficulty: 5 },
+            { classId: classMap["10 Б"].id, subjectId: subjectMap["Химия"].id, teacherId: teacher6.id, unitsPerWeek: 2, durationSlots: 1, itemType: ScheduleItemType.lesson, roomTypeRequired: RoomType.lab, difficulty: 4 },
+            { classId: classMap["10 Б"].id, subjectId: subjectMap["Биология"].id, teacherId: teacher6.id, unitsPerWeek: 1, durationSlots: 1, itemType: ScheduleItemType.lesson, roomTypeRequired: RoomType.lab, difficulty: 3 },
+            { classId: classMap["10 Б"].id, subjectId: subjectMap["История"].id, teacherId: teacher3.id, unitsPerWeek: 2, durationSlots: 1, itemType: ScheduleItemType.lesson, roomTypeRequired: RoomType.standard, difficulty: 2 },
+            { classId: classMap["10 Б"].id, subjectId: subjectMap["История Казахстана"].id, teacherId: teacher3.id, unitsPerWeek: 2, durationSlots: 1, itemType: ScheduleItemType.lesson, roomTypeRequired: RoomType.standard, difficulty: 2 },
+            { classId: classMap["10 Б"].id, subjectId: subjectMap["Информатика"].id, teacherId: teacher7.id, unitsPerWeek: 1, durationSlots: 1, itemType: ScheduleItemType.lesson, roomTypeRequired: RoomType.computer, difficulty: 3 },
+            { classId: classMap["10 Б"].id, subjectId: subjectMap["Физкультура"].id, teacherId: teacher8.id, unitsPerWeek: 2, durationSlots: 1, itemType: ScheduleItemType.lesson, roomTypeRequired: RoomType.outdoor, difficulty: 1 },
+            { classId: classMap["10 Б"].id, title: "Классный час", teacherId: teacher3.id, unitsPerWeek: 1, durationSlots: 1, itemType: ScheduleItemType.academicHour, roomTypeRequired: RoomType.standard, difficulty: 1, lockedDayOfWeek: 5, lockedSlotIndex: 6 },
+            { classId: classMap["10 Б"].id, title: "Практикум по STEM", teacherId: teacher7.id, unitsPerWeek: 1, durationSlots: 1, itemType: ScheduleItemType.academicHour, roomTypeRequired: RoomType.computer, difficulty: 2 },
+
+            { classId: classMap["10 В"].id, subjectId: subjectMap["Алгебра"].id, teacherId: teacher2.id, unitsPerWeek: 3, durationSlots: 1, itemType: ScheduleItemType.lesson, roomTypeRequired: RoomType.standard, difficulty: 4 },
+            { classId: classMap["10 В"].id, subjectId: subjectMap["Геометрия"].id, teacherId: teacher2.id, unitsPerWeek: 2, durationSlots: 1, itemType: ScheduleItemType.lesson, roomTypeRequired: RoomType.standard, difficulty: 4 },
+            { classId: classMap["10 В"].id, subjectId: subjectMap["Английский язык"].id, teacherId: teacher4.id, unitsPerWeek: 3, durationSlots: 1, itemType: ScheduleItemType.lesson, roomTypeRequired: RoomType.standard, difficulty: 2 },
+            { classId: classMap["10 В"].id, subjectId: subjectMap["Биология"].id, teacherId: teacher6.id, unitsPerWeek: 2, durationSlots: 1, itemType: ScheduleItemType.lesson, roomTypeRequired: RoomType.lab, difficulty: 3 },
+            { classId: classMap["10 В"].id, subjectId: subjectMap["Информатика"].id, teacherId: teacher7.id, unitsPerWeek: 2, durationSlots: 1, itemType: ScheduleItemType.lesson, roomTypeRequired: RoomType.computer, difficulty: 4 },
+            { classId: classMap["10 В"].id, subjectId: subjectMap["Физика"].id, teacherId: teacher8.id, unitsPerWeek: 2, durationSlots: 1, itemType: ScheduleItemType.lesson, roomTypeRequired: RoomType.lab, difficulty: 4 },
+            { classId: classMap["10 В"].id, subjectId: subjectMap["Химия"].id, teacherId: teacher6.id, unitsPerWeek: 2, durationSlots: 1, itemType: ScheduleItemType.lesson, roomTypeRequired: RoomType.lab, difficulty: 3 },
+            { classId: classMap["10 В"].id, subjectId: subjectMap["История"].id, teacherId: teacher3.id, unitsPerWeek: 2, durationSlots: 1, itemType: ScheduleItemType.lesson, roomTypeRequired: RoomType.standard, difficulty: 2 },
+            { classId: classMap["10 В"].id, subjectId: subjectMap["История Казахстана"].id, teacherId: teacher3.id, unitsPerWeek: 1, durationSlots: 1, itemType: ScheduleItemType.lesson, roomTypeRequired: RoomType.standard, difficulty: 2 },
+            { classId: classMap["10 В"].id, subjectId: subjectMap["Физкультура"].id, teacherId: teacher8.id, unitsPerWeek: 2, durationSlots: 1, itemType: ScheduleItemType.lesson, roomTypeRequired: RoomType.gym, difficulty: 1 },
+            { classId: classMap["10 В"].id, title: "Классный час", teacherId: teacher3.id, unitsPerWeek: 1, durationSlots: 1, itemType: ScheduleItemType.academicHour, roomTypeRequired: RoomType.standard, difficulty: 1, lockedDayOfWeek: 5, lockedSlotIndex: 5 },
+            { classId: classMap["10 В"].id, title: "STEM Assembly", unitsPerWeek: 1, durationSlots: 2, itemType: ScheduleItemType.event, roomTypeRequired: RoomType.hall, difficulty: 1, lockedDayOfWeek: 4, lockedSlotIndex: 3 },
+            { classId: classMap["10 В"].id, title: "Проектная мастерская", teacherId: teacher7.id, unitsPerWeek: 1, durationSlots: 1, itemType: ScheduleItemType.academicHour, roomTypeRequired: RoomType.computer, difficulty: 2 },
+
+            { classId: classMap["10 А"].id, bandId: englishBand.id, title: "Английский поток 10А/10Б", unitsPerWeek: 2, durationSlots: 1, itemType: ScheduleItemType.band, difficulty: 2 },
+            { classId: classMap["10 Б"].id, bandId: englishBand.id, title: "Английский поток 10А/10Б", unitsPerWeek: 2, durationSlots: 1, itemType: ScheduleItemType.band, difficulty: 2 },
         ],
     });
 
-    await prisma.scheduleConflict.createMany({
-        data: [
-            { schedulePlanId: schedulePlan.id, title: "Физрук заболел", description: "ИИ объединил 10А и 10Б на стадионе со вторым учителем.", severity: "medium", resolved: true },
-            { schedulePlanId: schedulePlan.id, title: "Ремонт зала", description: "Уроки переведены на альтернативные площадки согласно погоде.", severity: "low", resolved: true },
-        ],
+    const generated = await generateSmartSchedule({
+        weekStartDate: new Date("2026-03-30T00:00:00Z"),
+        createdById: userMap.admin.id,
+    });
+
+    await prisma.schedulePlan.update({
+        where: { id: generated.planId },
+        data: {
+            status: SchedulePlanStatus.published,
+            publishedAt: new Date("2026-03-29T07:10:00Z"),
+        },
+    });
+
+    await prisma.teacherAbsence.create({
+        data: {
+            teacherId: teacher1.id,
+            startsAt: new Date("2026-03-30T00:00:00Z"),
+            endsAt: new Date("2026-03-31T23:59:59Z"),
+            reason: "Больничный",
+            status: TeacherAbsenceStatus.active,
+        },
+    });
+
+    const leaderboardProfiles = [
+        {
+            studentId: student1.id,
+            scores: {
+                "Общий рейтинг": 1280,
+                "Точные науки": 980,
+                "Олимпиады": 600,
+            },
+        },
+        {
+            studentId: student2.id,
+            scores: {
+                "Общий рейтинг": 1450,
+                "Точные науки": 965,
+                "Олимпиады": 590,
+            },
+        },
+        {
+            studentId: student3.id,
+            scores: {
+                "Общий рейтинг": 1395,
+                "Точные науки": 942,
+                "Олимпиады": 575,
+            },
+        },
+        ...extraStudents.map((student, index) => ({
+            studentId: student.id,
+            scores: {
+                "Общий рейтинг": extraStudentSpecs[index].overallPoints,
+                "Точные науки": extraStudentSpecs[index].stemPoints,
+                "Олимпиады": extraStudentSpecs[index].olympiadPoints,
+            },
+        })),
+    ];
+
+    const leaderboardCategories = ["Общий рейтинг", "Точные науки", "Олимпиады"] as const;
+    const leaderboardEntries = leaderboardCategories.flatMap((category) => {
+        const sorted = [...leaderboardProfiles]
+            .sort((left, right) => right.scores[category] - left.scores[category])
+            .map((profile, index) => ({
+                studentId: profile.studentId,
+                category,
+                points: profile.scores[category],
+                rank: index + 1,
+                trend: index < 10 ? "up" : index < 30 ? "same" : "down",
+            }));
+
+        return sorted;
     });
 
     await prisma.leaderboardEntry.createMany({
-        data: [
-            { studentId: student2.id, category: "Общий рейтинг", points: 1450, rank: 1, trend: "up" },
-            { studentId: student3.id, category: "Общий рейтинг", points: 1395, rank: 2, trend: "up" },
-            { studentId: student1.id, category: "Общий рейтинг", points: 1280, rank: 4, trend: "up" },
-            { studentId: student1.id, category: "Точные науки", points: 980, rank: 1, trend: "up" },
-            { studentId: student2.id, category: "Точные науки", points: 965, rank: 2, trend: "up" },
-            { studentId: student1.id, category: "Олимпиады", points: 600, rank: 2, trend: "up" },
-            { studentId: student2.id, category: "Олимпиады", points: 590, rank: 3, trend: "up" },
-        ],
+        data: leaderboardEntries,
     });
+
+    const overallEntries = leaderboardEntries.filter((entry) => entry.category === "Общий рейтинг");
+    await Promise.all(
+        overallEntries.map((entry) =>
+            prisma.student.update({
+                where: { id: entry.studentId },
+                data: {
+                    rank: entry.rank,
+                    rankTotal: overallEntries.length,
+                },
+            }),
+        ),
+    );
 
     await prisma.studentBadge.createMany({
         data: [

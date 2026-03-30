@@ -8,6 +8,7 @@ type KioskPayload = {
     featured: { id: string; title: string; body: string } | null;
     spotlight: { id: string; title: string; body: string } | null;
     cafeteria: { id: string; title: string; body: string } | null;
+    meta: { weekLabel: string | null; updatedAt: string | null; replacementsCount: number };
 };
 
 export default function KioskMode() {
@@ -42,6 +43,10 @@ export default function KioskMode() {
                 <div>
                     <h1 className="text-5xl font-sora font-bold text-foreground mb-2">Aqbobek Lyceum</h1>
                     <p className="text-xl text-muted-foreground font-medium">Цифровая панель школы</p>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                        {kiosk?.meta.weekLabel ? `Публикация недели: ${kiosk.meta.weekLabel}` : "Ожидаем публикацию недели"}
+                        {kiosk?.meta.updatedAt ? ` • обновлено ${kiosk.meta.updatedAt}` : ""}
+                    </p>
                 </div>
                 <div className="text-right flex items-center gap-4">
                     <Clock className="w-8 h-8 text-primary" />
@@ -55,6 +60,7 @@ export default function KioskMode() {
                         <h2 className="text-3xl font-sora font-bold text-red-900 mb-6 flex items-center gap-3">
                             <ShieldAlert className="w-8 h-8" /> Замены на сегодня
                         </h2>
+                        <p className="text-sm text-red-800/70 mb-6">Активных карточек: {kiosk?.meta.replacementsCount ?? 0}</p>
                         <div className="space-y-6">
                             {kiosk?.replacements.map((item) => (
                                 <div key={item.id} className="bg-white rounded-2xl p-6 shadow-sm border border-red-100">
@@ -62,6 +68,12 @@ export default function KioskMode() {
                                     <p className="text-2xl font-bold text-foreground leading-tight">{item.body}</p>
                                 </div>
                             ))}
+                            {(kiosk?.replacements.length ?? 0) === 0 && (
+                                <div className="bg-white rounded-2xl p-6 shadow-sm border border-red-100">
+                                    <p className="text-xl font-bold text-foreground">Сегодня замен нет</p>
+                                    <p className="mt-2 text-sm text-muted-foreground">Цифровая панель автоматически покажет новые карточки после перестройки расписания.</p>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
