@@ -1,6 +1,6 @@
 # Aqbobek Hub
 
-`Aqbobek Hub` — это демонстрационная школьная платформа с несколькими ролями пользователей, построенная на `Next.js 16`, `React 19`, `TypeScript`, `Prisma 7` и `SQLite`.
+`Aqbobek Hub` — это демонстрационная школьная платформа с несколькими ролями пользователей, построенная на `Next.js 16`, `React 19`, `TypeScript`, `Prisma 7` и `SQLite`, с отдельным AI-чатом на `Gemini` и четырьмя собственными обученными ML-моделями.
 
 Проект показывает не только интерфейс, но и реальную серверную связку:
 
@@ -8,6 +8,7 @@
 - отдельный экран `киоска`
 - недельное расписание `Smart Schedule`
 - авто-перестройку расписания при больничном учителя
+- `4` встроенные обученные ML-модели для аналитики и рекомендаций
 - домашние задания с загрузкой решения
 - новости, рейтинг, настройки, AI-наставника
 - работу с заявками, инцидентами, рассылками и журналом событий
@@ -16,17 +17,18 @@
 
 - [1. Что это за проект](#1-что-это-за-проект)
 - [2. Технологии](#2-технологии)
-- [3. Основные роли и функции](#3-основные-роли-и-функции)
-- [4. Smart Schedule](#4-smart-schedule)
-- [5. Страницы приложения](#5-страницы-приложения)
-- [6. API](#6-api)
-- [7. Структура проекта](#7-структура-проекта)
-- [8. Пошаговый запуск](#8-пошаговый-запуск)
-- [9. Демо-аккаунты](#9-демо-аккаунты)
-- [10. Что создаёт seed-скрипт](#10-что-создаёт-seed-скрипт)
-- [11. Как быстро проверить, что всё работает](#11-как-быстро-проверить-что-всё-работает)
-- [12. Полезные команды](#12-полезные-команды)
-- [13. Известные замечания](#13-известные-замечания)
+- [3. AI и обученные ML-модели](#3-ai-и-обученные-ml-модели)
+- [4. Основные роли и функции](#4-основные-роли-и-функции)
+- [5. Smart Schedule](#5-smart-schedule)
+- [6. Страницы приложения](#6-страницы-приложения)
+- [7. API](#7-api)
+- [8. Структура проекта](#8-структура-проекта)
+- [9. Пошаговый запуск](#9-пошаговый-запуск)
+- [10. Демо-аккаунты](#10-демо-аккаунты)
+- [11. Что создаёт seed-скрипт](#11-что-создаёт-seed-скрипт)
+- [12. Как быстро проверить, что всё работает](#12-как-быстро-проверить-что-всё-работает)
+- [13. Полезные команды](#13-полезные-команды)
+- [14. Известные замечания](#14-известные-замечания)
 
 ## 1. Что это за проект
 
@@ -50,8 +52,221 @@
 - `Tailwind CSS 4`
 - `Lucide React`
 - `@google/genai` для AI-наставника
+- `Python 3` для локального ML-инференса
+- `pandas`, `joblib`, `scikit-learn` для обученных моделей
 
-## 3. Основные роли и функции
+## 3. AI и обученные ML-модели
+
+В проекте есть две разные AI-части, и это важно разделять:
+
+- `Gemini` используется как разговорный `AI-наставник`
+- `4` собственные обученные ML-модели используются для аналитики, прогнозов и рекомендаций внутри платформы
+
+То есть проект не сводится только к Gemini-чату. Чат помогает общаться с системой, а обученные модели считают риск слабой темы, качество расписания, подбор замены и релевантность учебных материалов.
+
+### AI-наставник на Gemini
+
+`AI-наставник` встроен в платформу как отдельный модуль общения с пользователем.
+
+Что он делает:
+
+- отвечает в формате школьного помощника для ученика, родителя, учителя и администратора
+- использует `@google/genai`
+- работает через `GEMINI_API_KEY`
+- получает контекст из реальных данных платформы: оценки, расписание, риски, задачи и общую учебную картину пользователя
+- доступен через страницу `/ai-assistant`
+
+Важно:
+
+- `Gemini` в этом проекте не заменяет локальные ML-модели
+- без `GEMINI_API_KEY` чат может быть недоступен, но остальные части платформы продолжают работать
+
+### Собственные обученные ML-модели
+
+Все четыре модели обучены внутри проекта и сохранены как локальные артефакты `joblib` вместе с препроцессорами. Node.js-часть платформы вызывает их через Python-скрипты, а результаты возвращаются обратно в интерфейс и API.
+
+#### 1. Topic Weakness Model
+
+Модель для определения слабых тем ученика по конкретному предмету и теме.
+
+Что анализирует:
+
+- класс ученика
+- предмет и тему
+- сложность темы
+- недавние и исторические оценки
+- средний балл по предмету
+- пропуски по теме
+- выполнение заданий
+- число попыток по квизам
+- тренд улучшения или ухудшения
+- близость экзамена
+- вовлечённость
+
+Что возвращает:
+
+- `weak_topic_probability`
+- `risk_level`: `strong`, `medium`, `weak`
+- русскую интерпретацию уровня риска
+
+Где используется:
+
+- кабинет ученика
+- `GET /api/student/topic-weakness`
+- `POST /api/student/topic-weakness`
+- [lib/topic-weakness.ts](/Users/kaliakbar/Desktop/aqbobek-hub/lib/topic-weakness.ts)
+- [topic_weakness_model/predict_topic_weakness.py](/Users/kaliakbar/Desktop/aqbobek-hub/topic_weakness_model/predict_topic_weakness.py)
+
+Как устроена:
+
+- это `classification`-модель
+- в обучающем пайплайне сравниваются `LogisticRegression` и `RandomForestClassifier`
+- сохраняется лучшая модель и отдельный препроцессор признаков
+
+Практическая польза:
+
+- помогает заранее находить темы, по которым ученик проседает
+- делает student dashboard не просто визуальным, а аналитическим
+
+#### 2. Schedule Quality Model
+
+Модель для оценки качества школьного расписания как цельной недельной сетки.
+
+Что анализирует:
+
+- количество классов, учителей и кабинетов
+- число конфликтов по кабинетам, учителям и классам
+- окна у учителей
+- подряд идущие сложные уроки у учеников
+- среднюю и максимальную дневную нагрузку
+- устойчивость расписания к заменам
+- баланс нагрузки по неделе
+- перегрузку пятницы и нарушения обеденных окон
+- сложность потоков и влияние событий
+
+Что возвращает:
+
+- `overall_quality_score` от `0` до `100`
+- `quality_band_label`: `low`, `medium`, `high`
+- русскую интерпретацию качества
+
+Где используется:
+
+- административный модуль расписания
+- `GET /api/admin/schedule/quality`
+- `POST /api/admin/schedule/quality`
+- [lib/schedule-quality.ts](/Users/kaliakbar/Desktop/aqbobek-hub/lib/schedule-quality.ts)
+- [schedule_quality_model/predict_schedule_quality.py](/Users/kaliakbar/Desktop/aqbobek-hub/schedule_quality_model/predict_schedule_quality.py)
+
+Как устроена:
+
+- это `regression`-модель
+- в обучающем пайплайне сравниваются `LinearRegression` и `RandomForestRegressor`
+- на выходе числовой score дополнительно переводится в понятный band качества
+
+Практическая польза:
+
+- позволяет администратору не просто генерировать расписание, а проверять его качество до публикации
+- добавляет к `Smart Schedule` слой аналитической оценки
+
+#### 3. Substitute Matcher Model
+
+Модель для подбора наиболее подходящей замены учителя при больничном или отсутствии.
+
+Что анализирует:
+
+- контекст урока: предмет, класс, слот, день недели, тип кабинета и сложность потока
+- опыт исходного учителя
+- специализацию кандидата на замену
+- вторичную специализацию
+- опыт кандидата
+- работал ли кандидат с этим классом или параллелью раньше
+- доступность кандидата
+- текущую дневную и недельную нагрузку
+- число подряд идущих уроков
+- расстояние до нужного кабинета
+- риск выгорания и степень нарушения текущего расписания
+
+Что возвращает:
+
+- `predicted_substitute_fit_score` от `0` до `1`
+- `fit_label`: `low`, `medium`, `high`
+- русское объяснение, насколько кандидат подходит
+
+Где используется:
+
+- блок замен в административном расписании
+- `GET /api/admin/schedule/substitutes`
+- `POST /api/admin/schedule/substitutes`
+- [lib/substitute-matcher.ts](/Users/kaliakbar/Desktop/aqbobek-hub/lib/substitute-matcher.ts)
+- [substitute_matcher_model/predict_substitute_match.py](/Users/kaliakbar/Desktop/aqbobek-hub/substitute_matcher_model/predict_substitute_match.py)
+
+Как устроена:
+
+- это `ranking/regression`-модель
+- в обучающем пайплайне сравниваются `LinearRegression` и `RandomForestRegressor`
+- кандидаты ранжируются по score, после чего возвращается top-N лучших вариантов
+
+Практическая польза:
+
+- ускоряет поиск замены
+- снижает хаотичность ручного выбора
+- учитывает не только предмет, но и нагрузку, continuity и устойчивость расписания
+
+#### 4. Resource Recommender Model
+
+Модель для персональной рекомендации учебных материалов ученику.
+
+Что анализирует:
+
+- слабую тему ученика
+- вероятность слабой темы
+- уровень освоения темы
+- язык предпочтения
+- предпочитаемый тип контента
+- близость экзамена
+- вовлечённость
+- доступное время на обучение
+- характеристики ресурса: предмет, тема, сложность, длительность, язык, качество, популярность и интерактивность
+
+Что возвращает:
+
+- список наиболее релевантных материалов
+- `predicted_relevance_score`
+- русскую метку релевантности
+
+Где используется:
+
+- student dashboard
+- `GET /api/student/resource-recommendations`
+- `POST /api/student/resource-recommendations`
+- [lib/resource-recommender.ts](/Users/kaliakbar/Desktop/aqbobek-hub/lib/resource-recommender.ts)
+- [Resource recommender/recommend_resources.py](</Users/kaliakbar/Desktop/aqbobek-hub/Resource recommender/recommend_resources.py>)
+
+Как устроена:
+
+- это `regression/ranking`-модель
+- она ранжирует каталог ресурсов под конкретный контекст ученика
+- в обучающем пайплайне сравниваются `LinearRegression` и `RandomForestRegressor`
+
+Практическая польза:
+
+- превращает блок рекомендаций в персонализированный модуль, а не в статичный список ссылок
+- связывает аналитику слабых тем с дальнейшим учебным действием
+
+### Как AI и ML связаны между собой
+
+Связка в проекте выглядит так:
+
+- `Gemini` отвечает за диалоговый интерфейс
+- `topic weakness model` находит слабые темы ученика
+- `resource recommender` предлагает подходящие материалы под найденную слабую тему
+- `schedule quality model` оценивает качество недельного расписания
+- `substitute matcher model` помогает находить лучшую замену учителя
+
+Именно поэтому проект можно позиционировать как школьную платформу не только с интерфейсом и чатом, но и с собственной прикладной ML-логикой.
+
+## 4. Основные роли и функции
 
 ### Ученик
 
@@ -153,7 +368,7 @@
 - замены и перестроенные уроки
 - актуальные карточки киоска из базы
 
-## 4. Smart Schedule
+## 5. Smart Schedule
 
 `Smart Schedule` — это модуль недельного расписания.
 
@@ -196,7 +411,7 @@
 - [lib/schedule-quality.ts](/Users/kaliakbar/Desktop/aqbobek-hub/lib/schedule-quality.ts)
 - [lib/substitute-matcher.ts](/Users/kaliakbar/Desktop/aqbobek-hub/lib/substitute-matcher.ts)
 
-## 5. Страницы приложения
+## 6. Страницы приложения
 
 ### Общие страницы
 
@@ -231,7 +446,7 @@
 - `/admin`
 - `/admin/schedule`
 
-## 6. API
+## 7. API
 
 Ниже перечислены основные API-эндпоинты проекта.
 
@@ -249,13 +464,21 @@
 - `GET /api/me/settings`
 - `PATCH /api/me/settings`
 
+### API AI-наставника
+
+- `POST /api/ai-assistant`
+- `GET /api/ai-assistant/history`
+- `DELETE /api/ai-assistant/history`
+
 ### API ученика
 
 - `GET /api/student/dashboard`
 - `GET /api/student/profile`
 - `POST /api/student/activity`
 - `GET /api/student/resource-recommendations`
+- `POST /api/student/resource-recommendations`
 - `GET /api/student/topic-weakness`
+- `POST /api/student/topic-weakness`
 - `POST /api/student/homework/submissions`
 
 ### API учителя
@@ -304,7 +527,7 @@
 - `GET /api/mock/bilimclass/students/[studentId]/grades`
 - `GET /api/mock/bilimclass/students/[studentId]/attendance`
 
-## 7. Структура проекта
+## 8. Структура проекта
 
 ### Основные app-страницы
 
@@ -337,13 +560,22 @@
 - [lib/resource-recommender.ts](/Users/kaliakbar/Desktop/aqbobek-hub/lib/resource-recommender.ts)
 - [lib/mock-bilimclass.ts](/Users/kaliakbar/Desktop/aqbobek-hub/lib/mock-bilimclass.ts)
 
+### AI и ML-модули
+
+- [app/(dashboard)/ai-assistant/page.tsx](/Users/kaliakbar/Desktop/aqbobek-hub/app/(dashboard)/ai-assistant/page.tsx)
+- [app/api/ai-assistant/route.ts](/Users/kaliakbar/Desktop/aqbobek-hub/app/api/ai-assistant/route.ts)
+- [topic_weakness_model/predict_topic_weakness.py](/Users/kaliakbar/Desktop/aqbobek-hub/topic_weakness_model/predict_topic_weakness.py)
+- [schedule_quality_model/predict_schedule_quality.py](/Users/kaliakbar/Desktop/aqbobek-hub/schedule_quality_model/predict_schedule_quality.py)
+- [substitute_matcher_model/predict_substitute_match.py](/Users/kaliakbar/Desktop/aqbobek-hub/substitute_matcher_model/predict_substitute_match.py)
+- [Resource recommender/recommend_resources.py](</Users/kaliakbar/Desktop/aqbobek-hub/Resource recommender/recommend_resources.py>)
+
 ### База данных
 
 - [prisma/schema.prisma](/Users/kaliakbar/Desktop/aqbobek-hub/prisma/schema.prisma)
 - [prisma/seed.ts](/Users/kaliakbar/Desktop/aqbobek-hub/prisma/seed.ts)
 - [dev.db](/Users/kaliakbar/Desktop/aqbobek-hub/dev.db)
 
-## 8. Пошаговый запуск
+## 9. Пошаговый запуск
 
 Ниже — полная инструкция запуска проекта с нуля.
 
@@ -353,12 +585,14 @@
 
 - `Node.js 20+`
 - `npm`
+- `python3` для локальных ML-моделей
 
 Проверить версии:
 
 ```bash
 node -v
 npm -v
+python3 --version
 ```
 
 ### Шаг 1. Клонировать проект
@@ -380,12 +614,18 @@ cd /Users/kaliakbar/Desktop/aqbobek-hub
 npm install
 ```
 
+Для локального запуска обученных ML-моделей также желательно установить Python-зависимости:
+
+```bash
+python3 -m pip install pandas scikit-learn joblib
+```
+
 ### Шаг 3. Проверить переменные окружения
 
 Проект использует:
 
 - локальную SQLite-базу
-- опциональный `GEMINI_API_KEY` для AI-наставника
+- опциональный `GEMINI_API_KEY` только для AI-наставника на `Gemini`
 
 Если нужен AI-чат, добавьте в `.env.local`:
 
@@ -393,7 +633,7 @@ npm install
 GEMINI_API_KEY=your_key_here
 ```
 
-Если ключ не задан, остальная платформа продолжит работать, но AI-функции могут быть недоступны.
+Если ключ не задан, чат с `Gemini` будет недоступен, но остальные функции платформы и локальные ML-модели смогут работать отдельно.
 
 ### Шаг 4. Подготовить базу данных
 
@@ -462,7 +702,7 @@ npm run lint
 npm run build
 ```
 
-## 9. Демо-аккаунты
+## 10. Демо-аккаунты
 
 Пароль для видимых демо-пользователей:
 
@@ -512,7 +752,7 @@ npm run build
 
 Вход под них не предполагается.
 
-## 10. Что создаёт seed-скрипт
+## 11. Что создаёт seed-скрипт
 
 `prisma/seed.ts` поднимает целый демонстрационный мир:
 
@@ -554,7 +794,14 @@ npm run build
 - карточки киоска
 - история чата для AI-наставника
 
-## 11. Как быстро проверить, что всё работает
+Дополнительно проект использует локальные ML-артефакты:
+
+- `topic_weakness_model.joblib`
+- `schedule_quality_model.joblib`
+- `substitute_matcher_model.joblib`
+- `resource_recommender_model.joblib`
+
+## 12. Как быстро проверить, что всё работает
 
 Ниже простой smoke-check.
 
@@ -619,7 +866,7 @@ npm run lint
 npm run build
 ```
 
-## 12. Полезные команды
+## 13. Полезные команды
 
 ```bash
 npm run dev
@@ -645,9 +892,10 @@ npx prisma generate
 npx prisma studio
 ```
 
-## 13. Известные замечания
+## 14. Известные замечания
 
-- `AI-наставник` требует `GEMINI_API_KEY`
+- `AI-наставник` на `Gemini` требует `GEMINI_API_KEY`
+- локальные ML-модели вызываются через `python3`; если Python-инференс недоступен, часть сценариев использует fallback-логику на TypeScript-стороне
 - push-уведомления сейчас реализованы как встроенные уведомления, а не как browser push
 - часть действий учителя пока работает через систему задач, а не через отдельный модуль полноценного журнала урока
 - при `npm run build` возможны framework warnings про:
