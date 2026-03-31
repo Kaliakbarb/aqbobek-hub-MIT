@@ -89,9 +89,7 @@ export default function StudentDashboard() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ title: text, color }),
             });
-        } catch {
-            // Keep the UX responsive even if the activity log write fails.
-        }
+        } catch {}
     };
 
     const student = dashboard?.student;
