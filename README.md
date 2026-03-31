@@ -1,110 +1,182 @@
 # Aqbobek Hub
 
-`Aqbobek Hub` is a multi-role school platform demo built on `Next.js 16`, `React 19`, `Prisma 7` and `SQLite`.
+`Aqbobek Hub` — это демонстрационная школьная платформа с несколькими ролями пользователей, построенная на `Next.js 16`, `React 19`, `TypeScript`, `Prisma 7` и `SQLite`.
 
-The project is not just a UI mock. It includes:
+Проект показывает не только интерфейс, но и реальную серверную связку:
 
-- role-based dashboards for `student`, `teacher`, `parent`, `admin`
-- a public `kiosk` screen
-- a weekly `Smart Schedule` engine with constraints and reoptimization
-- in-app school notifications through `Broadcast`, `KioskItem`, `EventLog`
-- a student homework upload flow
-- teacher workbench actions
-- parent-facing progress summaries
-- news, leaderboard, settings, AI assistant and mock BilimClass data endpoints
+- кабинеты `ученика`, `учителя`, `родителя`, `администратора`
+- отдельный экран `киоска`
+- недельное расписание `Smart Schedule`
+- авто-перестройку расписания при больничном учителя
+- домашние задания с загрузкой решения
+- новости, рейтинг, настройки, AI-наставника
+- работу с заявками, инцидентами, рассылками и журналом событий
 
-## Stack
+## Содержание
+
+- [1. Что это за проект](#1-что-это-за-проект)
+- [2. Технологии](#2-технологии)
+- [3. Основные роли и функции](#3-основные-роли-и-функции)
+- [4. Smart Schedule](#4-smart-schedule)
+- [5. Страницы приложения](#5-страницы-приложения)
+- [6. API](#6-api)
+- [7. Структура проекта](#7-структура-проекта)
+- [8. Пошаговый запуск](#8-пошаговый-запуск)
+- [9. Демо-аккаунты](#9-демо-аккаунты)
+- [10. Что создаёт seed-скрипт](#10-что-создаёт-seed-скрипт)
+- [11. Как быстро проверить, что всё работает](#11-как-быстро-проверить-что-всё-работает)
+- [12. Полезные команды](#12-полезные-команды)
+- [13. Известные замечания](#13-известные-замечания)
+
+## 1. Что это за проект
+
+Идея проекта — дать школе единую цифровую платформу, в которой:
+
+- ученик видит оценки, риски, расписание, достижения и домашку
+- учитель управляет своей неделей, классами, задачами и больничным
+- родитель получает понятную картину по ребёнку без перегруза
+- администратор управляет школой через административный кабинет и модуль расписания
+- экран киоска показывает важную публичную информацию для школы
+
+Проект ориентирован на демонстрационный и портфолио-формат, но внутри уже есть рабочая серверная логика, а не только моковые карточки.
+
+## 2. Технологии
 
 - `Next.js 16.2.1`
 - `React 19.2.4`
 - `TypeScript`
 - `Prisma 7.6`
-- `SQLite` via `better-sqlite3`
+- `SQLite` через `better-sqlite3`
 - `Tailwind CSS 4`
 - `Lucide React`
-- `@google/genai` for the AI assistant
+- `@google/genai` для AI-наставника
 
-## Project Goals
+## 3. Основные роли и функции
 
-This demo is designed to look and behave like a connected internal school platform where:
+### Ученик
 
-- students see progress, schedule, achievements, homework and recommendations
-- teachers manage classes, weekly lessons, sick leave, tasks and communication
-- parents get a calmer summary of child progress and attendance
-- admins manage broadcasts, approvals, incidents and the full scheduling system
-- kiosk screens display announcements and replacements
+У ученика сейчас есть следующие функции:
 
-## Main Product Areas
+- главная страница ученика
+- просмотр оценок и динамики по предметам
+- просмотр рисков и слабых тем
+- персональные рекомендации по материалам
+- просмотр новостей
+- просмотр лидерборда
+- отдельная страница полного недельного расписания
+- карточка выбранного урока
+- страница профиля
+- достижения, бейджи и прогресс
+- отдельный раздел домашнего задания
+- загрузка файла решения
+- сохранение черновика домашки без файла
+- запись активности ученика в activity feed
+- доступ к AI-наставнику
+- изменение настроек профиля и уведомлений
+- смена пароля
 
-### Student
+### Учитель
 
-- dashboard with grades, risks, recommendations and schedule preview
-- full weekly schedule page
-- profile page with achievements and portfolio-style stats
-- homework page with upload / draft submission flow
-- activity logging from UI actions
+Учительский кабинет теперь разделён на несколько страниц и включает:
 
-### Teacher
-
-- split workspace instead of one overloaded page
-- `Overview`
-- `Schedule`
-- `Classes`
+- `Обзор`
+- `Расписание`
+- `Классы`
 - `Workbench`
-- working actions for:
-  - report generation
-  - attendance follow-up
-  - open lesson journal task
-  - assign homework task
-  - class communication task
-  - support plan generation
-  - sick leave request with automatic schedule reoptimization
 
-### Parent
+Что умеет учитель:
 
-- calmer summary dashboard
-- weekly family guidance
-- progress / attendance / alerts summary
+- смотреть недельное расписание
+- видеть ближайшие уроки
+- видеть замены и перестроенные слоты
+- видеть список своих классов
+- видеть число учеников, риски и пропуски по классам
+- видеть задачи учителя
+- отмечать выполнение задач
+- ставить задачу на мини-тест
+- ставить задачу на план поддержки
+- ставить задачу на сообщение родителям
+- ставить задачу на сообщение классу
+- открывать задачу на журнал урока
+- открывать задачу на посещаемость
+- открывать задачу на домашнее задание
+- формировать краткий отчёт
+- отправлять себя на больничный
+- запускать авто-перестройку недели через больничный
+- видеть сообщения администрации
 
-### Admin
+### Родитель
 
-- command center dashboard
-- approval workflow
-- incident resolution
-- broadcasts
-- announcements
-- local demo data import
-- weekly schedule management
+Родительский кабинет сейчас даёт:
 
-### Kiosk
+- обзор по ребёнку
+- успеваемость
+- посещаемость
+- сигналы внимания
+- рекомендации на неделю
+- спокойные подсказки для разговора дома
+- доступ к новостям
+- доступ к настройкам
+- доступ к AI-наставнику
 
-- school-wide info feed
-- replacement cards
-- admin-generated announcements
+### Администратор
 
-## Smart Schedule v1
+У администратора есть:
 
-The scheduling system is the most advanced module in the project.
+- командный центр
+- статистика по ученикам и учителям
+- работа с заявками на согласование
+- работа с инцидентами
+- центр рассылок
+- публикация объявлений
+- импорт локальных демо-данных
+- доступ к модулю расписания
 
-### What it does
+Что умеет модуль расписания у администратора:
 
-- builds a real weekly schedule for `Mon-Fri`
-- supports a target of `5 lessons per day`
-- respects:
-  - teacher availability
-  - room availability
-  - class conflicts
-  - teacher conflicts
-  - room conflicts
-  - pairs
-  - academic hours
-  - events
-  - parallel `bands`
-- stores draft and published weekly plans
-- reoptimizes the published plan when a teacher goes on sick leave
-- creates in-app notifications for affected classes and substitute teachers
+- смотреть опубликованный и черновой недельный план
+- смотреть качество расписания
+- смотреть замены
+- сохранять ограничения
+- генерировать черновик расписания
+- публиковать план
+- запускать перестройку расписания при больничном
+- смотреть конфликты
+- смотреть активные больничные
 
-### Important schedule entities
+### Экран киоска
+
+Экран киоска показывает:
+
+- школьные объявления
+- системные карточки
+- замены и перестроенные уроки
+- актуальные карточки киоска из базы
+
+## 4. Smart Schedule
+
+`Smart Schedule` — это модуль недельного расписания.
+
+### Что он поддерживает
+
+- недельную сетку `Пн-Пт`
+- целевую нагрузку `5 уроков в день`
+- доступность учителей
+- доступность кабинетов
+- требования по классам на неделю
+- пары
+- академические часы
+- мероприятия
+- ленты `bands`
+- контроль конфликтов по:
+  - классу
+  - учителю
+  - кабинету
+- режим черновика и публикации
+- локальную перестройку при больничном учителя
+- встроенные уведомления после изменений
+
+### Главные сущности расписания
 
 - `SchedulePlan`
 - `ScheduleSlot`
@@ -117,16 +189,16 @@ The scheduling system is the most advanced module in the project.
 - `ScheduleBandMember`
 - `TeacherAbsence`
 
-### Key server files
+### Главные файлы расписания
 
 - [lib/smart-schedule.ts](/Users/kaliakbar/Desktop/aqbobek-hub/lib/smart-schedule.ts)
+- [lib/schedule-constants.ts](/Users/kaliakbar/Desktop/aqbobek-hub/lib/schedule-constants.ts)
 - [lib/schedule-quality.ts](/Users/kaliakbar/Desktop/aqbobek-hub/lib/schedule-quality.ts)
 - [lib/substitute-matcher.ts](/Users/kaliakbar/Desktop/aqbobek-hub/lib/substitute-matcher.ts)
-- [lib/server-data.ts](/Users/kaliakbar/Desktop/aqbobek-hub/lib/server-data.ts)
 
-## Routes and Pages
+## 5. Страницы приложения
 
-### Public / shared
+### Общие страницы
 
 - `/`
 - `/login`
@@ -136,46 +208,48 @@ The scheduling system is the most advanced module in the project.
 - `/ai-assistant`
 - `/kiosk`
 
-### Student routes
+### Страницы ученика
 
 - `/student`
 - `/student/schedule`
 - `/student/homework`
 - `/student/profile`
 
-### Teacher routes
+### Страницы учителя
 
 - `/teacher`
 - `/teacher/schedule`
 - `/teacher/classes`
 - `/teacher/workbench`
 
-### Parent routes
+### Страницы родителя
 
 - `/parent`
 
-### Admin routes
+### Страницы администратора
 
 - `/admin`
 - `/admin/schedule`
 
-## API Overview
+## 6. API
 
-### Auth and session
+Ниже перечислены основные API-эндпоинты проекта.
+
+### Авторизация и сессия
 
 - `POST /api/auth/login`
 - `POST /api/auth/logout`
 - `GET /api/auth/session`
 - `POST /api/auth/change-password`
 
-### Common profile/settings
+### Профиль и настройки
 
 - `GET /api/me`
 - `PATCH /api/me`
 - `GET /api/me/settings`
 - `PATCH /api/me/settings`
 
-### Student API
+### API ученика
 
 - `GET /api/student/dashboard`
 - `GET /api/student/profile`
@@ -184,7 +258,7 @@ The scheduling system is the most advanced module in the project.
 - `GET /api/student/topic-weakness`
 - `POST /api/student/homework/submissions`
 
-### Teacher API
+### API учителя
 
 - `GET /api/teacher/dashboard`
 - `POST /api/teacher/reports`
@@ -192,11 +266,11 @@ The scheduling system is the most advanced module in the project.
 - `PATCH /api/teacher/tasks/[id]`
 - `POST /api/teacher/absences`
 
-### Parent API
+### API родителя
 
 - `GET /api/parent/dashboard`
 
-### Admin API
+### API администратора
 
 - `GET /api/admin/dashboard`
 - `GET /api/admin/broadcasts`
@@ -205,7 +279,7 @@ The scheduling system is the most advanced module in the project.
 - `PATCH /api/admin/incidents/[id]`
 - `POST /api/admin/migrate-local`
 
-### Smart Schedule API
+### API расписания
 
 - `GET /api/admin/schedule`
 - `POST /api/admin/schedule/generate`
@@ -217,7 +291,7 @@ The scheduling system is the most advanced module in the project.
 - `GET /api/admin/schedule/substitutes`
 - `POST /api/admin/schedule/substitutes`
 
-### Content and demo data API
+### Контент и демонстрационные данные
 
 - `GET /api/news`
 - `POST /api/news`
@@ -230,9 +304,9 @@ The scheduling system is the most advanced module in the project.
 - `GET /api/mock/bilimclass/students/[studentId]/grades`
 - `GET /api/mock/bilimclass/students/[studentId]/attendance`
 
-## Folder Map
+## 7. Структура проекта
 
-### App routes
+### Основные app-страницы
 
 - [app/(dashboard)/student/page.tsx](/Users/kaliakbar/Desktop/aqbobek-hub/app/(dashboard)/student/page.tsx)
 - [app/(dashboard)/student/schedule/page.tsx](/Users/kaliakbar/Desktop/aqbobek-hub/app/(dashboard)/student/schedule/page.tsx)
@@ -247,84 +321,160 @@ The scheduling system is the most advanced module in the project.
 - [app/(dashboard)/admin/schedule/page.tsx](/Users/kaliakbar/Desktop/aqbobek-hub/app/(dashboard)/admin/schedule/page.tsx)
 - [app/kiosk/page.tsx](/Users/kaliakbar/Desktop/aqbobek-hub/app/kiosk/page.tsx)
 
-### Shared UI
+### Общие UI-компоненты
 
 - [components/DashboardShell.tsx](/Users/kaliakbar/Desktop/aqbobek-hub/components/DashboardShell.tsx)
 
-### Domain and data assembly
+### Серверная логика и сборка данных
 
 - [lib/server-data.ts](/Users/kaliakbar/Desktop/aqbobek-hub/lib/server-data.ts)
 - [lib/session.ts](/Users/kaliakbar/Desktop/aqbobek-hub/lib/session.ts)
 - [lib/http.ts](/Users/kaliakbar/Desktop/aqbobek-hub/lib/http.ts)
 - [lib/smart-schedule.ts](/Users/kaliakbar/Desktop/aqbobek-hub/lib/smart-schedule.ts)
-- [lib/schedule-constants.ts](/Users/kaliakbar/Desktop/aqbobek-hub/lib/schedule-constants.ts)
 - [lib/schedule-quality.ts](/Users/kaliakbar/Desktop/aqbobek-hub/lib/schedule-quality.ts)
 - [lib/substitute-matcher.ts](/Users/kaliakbar/Desktop/aqbobek-hub/lib/substitute-matcher.ts)
 - [lib/topic-weakness.ts](/Users/kaliakbar/Desktop/aqbobek-hub/lib/topic-weakness.ts)
 - [lib/resource-recommender.ts](/Users/kaliakbar/Desktop/aqbobek-hub/lib/resource-recommender.ts)
 - [lib/mock-bilimclass.ts](/Users/kaliakbar/Desktop/aqbobek-hub/lib/mock-bilimclass.ts)
 
-### Database
+### База данных
 
 - [prisma/schema.prisma](/Users/kaliakbar/Desktop/aqbobek-hub/prisma/schema.prisma)
 - [prisma/seed.ts](/Users/kaliakbar/Desktop/aqbobek-hub/prisma/seed.ts)
+- [dev.db](/Users/kaliakbar/Desktop/aqbobek-hub/dev.db)
 
-## Local Setup
+## 8. Пошаговый запуск
 
-### 1. Install dependencies
+Ниже — полная инструкция запуска проекта с нуля.
+
+### Требования
+
+На машине должны быть установлены:
+
+- `Node.js 20+`
+- `npm`
+
+Проверить версии:
+
+```bash
+node -v
+npm -v
+```
+
+### Шаг 1. Клонировать проект
+
+```bash
+git clone https://github.com/Kaliakbarb/aqbobek-hub-MIT.git
+cd aqbobek-hub-MIT
+```
+
+Если проект уже открыт локально, просто перейдите в папку:
+
+```bash
+cd /Users/kaliakbar/Desktop/aqbobek-hub
+```
+
+### Шаг 2. Установить зависимости
 
 ```bash
 npm install
 ```
 
-### 2. Prepare database
+### Шаг 3. Проверить переменные окружения
 
-Fresh reset:
+Проект использует:
+
+- локальную SQLite-базу
+- опциональный `GEMINI_API_KEY` для AI-наставника
+
+Если нужен AI-чат, добавьте в `.env.local`:
+
+```bash
+GEMINI_API_KEY=your_key_here
+```
+
+Если ключ не задан, остальная платформа продолжит работать, но AI-функции могут быть недоступны.
+
+### Шаг 4. Подготовить базу данных
+
+Для чистого запуска используйте полный reset:
 
 ```bash
 npx prisma migrate reset --force
 npm run db:seed
 ```
 
-If you only need to reseed current DB:
+Что делают эти команды:
+
+1. удаляют текущую локальную базу
+2. применяют все миграции
+3. пересоздают структуру
+4. заливают демонстрационные данные
+
+Если база уже есть и нужно только перезалить демонстрационные данные:
 
 ```bash
 npm run db:seed
 ```
 
-### 3. Start app
+### Шаг 5. Запустить dev-сервер
 
 ```bash
 npm run dev
 ```
 
-Then open:
+После запуска проект будет доступен по адресу:
 
 - [http://localhost:3000](http://localhost:3000)
+
+Экран киоска:
+
 - [http://localhost:3000/kiosk](http://localhost:3000/kiosk)
 
-## Environment
+### Шаг 6. Войти в систему
 
-The app uses:
+Откройте:
 
-- local SQLite database at [dev.db](/Users/kaliakbar/Desktop/aqbobek-hub/dev.db)
-- optional `GEMINI_API_KEY` for the AI assistant
+- [http://localhost:3000/login](http://localhost:3000/login)
 
-If `GEMINI_API_KEY` is present, `/api/ai-assistant` can answer with the Google model configured in [app/api/ai-assistant/route.ts](/Users/kaliakbar/Desktop/aqbobek-hub/app/api/ai-assistant/route.ts).
+И используйте один из демо-логинов из раздела ниже.
 
-## Demo Accounts
+### Шаг 7. Проверить Prisma-клиент при изменениях схемы
 
-Password for visible demo users:
+Если вы меняли `prisma/schema.prisma`, выполните:
+
+```bash
+npx prisma generate
+```
+
+Если меняли схему и хотите создать новую миграцию:
+
+```bash
+npx prisma migrate dev
+```
+
+### Шаг 8. Проверить production build
+
+Перед финальной сдачей желательно прогнать:
+
+```bash
+npm run lint
+npm run build
+```
+
+## 9. Демо-аккаунты
+
+Пароль для видимых демо-пользователей:
 
 - `12345`
 
-### Students
+### Ученики
 
 - `student1`
 - `student2`
 - `student3`
 
-### Teachers
+### Учителя
 
 - `teacher1`
 - `teacher2`
@@ -335,230 +485,141 @@ Password for visible demo users:
 - `teacher7`
 - `teacher8`
 
-### Parents
+### Родители
 
 - `parent1`
 - `parent2`
 - `parent3`
 
-### Admin
+### Администратор
 
 - `admin`
 
-### Seed-only extra students
+### Скрытые фоновые ученики
 
-The seed also creates hidden background students to make class sizes and leaderboard density more realistic:
+В seed-скрипте дополнительно создаются фоновые ученики для реалистичности:
 
-- `20 extra students` per class in `10 А`, `10 Б`, `10 В`
-- these hidden students are not intended for demo login
-- they use a separate seed-only password and exist mainly for leaderboard, analytics and class realism
-
-## What the Seed Creates
-
-The seed builds a connected demo school world:
-
-- 3 school classes:
+- по `20` учеников на каждый класс:
   - `10 А`
   - `10 Б`
   - `10 В`
-- core subjects
-- 3 visible students
-- 60 hidden background students
-- 8 teachers
-- 3 parents
-- 1 admin
-- grades
-- attendance
-- student goals
-- achievements
-- badges
-- activity feed entries
+
+Они нужны для:
+
+- более плотного лидерборда
+- реалистичного размера классов
+- правдоподобной аналитики
+
+Вход под них не предполагается.
+
+## 10. Что создаёт seed-скрипт
+
+`prisma/seed.ts` поднимает целый демонстрационный мир:
+
+- классы
+- предметы
+- пользователи всех ролей
+- видимые ученики
+- скрытые фоновые ученики
+- учителя
+- родители
+- администратора
+- user settings
+- teaching assignments
+- оценки
+- посещаемость
+- цели учеников
+- достижения
+- навыки
+- activity feed
 - risk alerts
-- leaderboard entries
-- teacher tasks
-- homework assignments and submissions
-- news items
-- broadcasts
-- kiosk items
+- задачи учителей
+- задания по домашней работе
+- отправленные решения домашней работы
+- недельные ограничения расписания
+- rooms
+- teacher availability
+- room availability
+- ленты `bands`
+- недельные учебные требования
+- сгенерированное недельное расписание
+- active absences
+- записи рейтинга
+- student badges
+- новости
+- рассылки
 - approvals
 - incidents
-- event log
-- weekly scheduling constraints
-- generated weekly schedule
+- журнал событий
+- карточки киоска
+- история чата для AI-наставника
 
-## How the Roles Are Connected
+## 11. Как быстро проверить, что всё работает
 
-### Student
+Ниже простой smoke-check.
 
-Student pages and APIs are fed through [lib/server-data.ts](/Users/kaliakbar/Desktop/aqbobek-hub/lib/server-data.ts) and read:
+### Проверка ученика
 
-- grades
-- risk alerts
-- leaderboard placement
-- weekly schedule
-- homework assignments/submissions
-- achievements and badges
-- personalized study recommendations
+1. Войти как `student1`
+2. Открыть `/student`
+3. Проверить `/student/schedule`
+4. Проверить `/student/homework`
+5. Проверить `/student/profile`
+6. Проверить `/leaderboard`
+7. Проверить `/news`
+8. Проверить `/settings`
 
-### Teacher
+Что должно работать:
 
-Teacher pages now use one backend payload and are split into focused screens:
+- загрузка кабинета ученика
+- открытие полного расписания
+- домашка
+- профиль и достижения
+- новости
+- рейтинг
+- настройки
 
-- `Overview` for priorities and next lesson
-- `Schedule` for the weekly timetable
-- `Classes` for class summaries and risk students
-- `Workbench` for tasks, broadcasts and sick leave
+### Проверка учителя
 
-Teacher action buttons are wired to:
+1. Войти как `teacher1`
+2. Открыть `/teacher`
+3. Открыть `/teacher/schedule`
+4. Открыть `/teacher/classes`
+5. Открыть `/teacher/workbench`
 
-- `TeacherTask`
-- `EventLog`
-- `TeacherAbsence`
-- schedule reoptimization flow
+Что должно работать:
 
-### Parent
+- обзор учителя
+- недельное расписание
+- список классов
+- задачи
+- кнопки teacher actions
+- больничный
 
-Parent pages summarize:
+### Проверка родителя
 
-- child performance
-- attendance
-- alerts
-- family guidance
+1. Войти как `parent1`
+2. Открыть `/parent`
+3. Открыть `/news`
+4. Открыть `/settings`
 
-### Admin
+### Проверка администратора
 
-Admin screens work with:
+1. Войти как `admin`
+2. Открыть `/admin`
+3. Открыть `/admin/schedule`
+4. Проверить отправку рассылки
+5. Проверить публикацию объявления
+6. Проверить schedule generate / publish
 
-- `Approval`
-- `Incident`
-- `Broadcast`
-- `NewsItem`
-- `EventLog`
-- full schedule management endpoints
-
-## Homework Upload Flow
-
-Student homework is handled through:
-
-- [app/(dashboard)/student/homework/page.tsx](/Users/kaliakbar/Desktop/aqbobek-hub/app/(dashboard)/student/homework/page.tsx)
-- [app/(dashboard)/student/homework/StudentHomeworkView.tsx](/Users/kaliakbar/Desktop/aqbobek-hub/app/(dashboard)/student/homework/StudentHomeworkView.tsx)
-- [app/api/student/homework/submissions/route.ts](/Users/kaliakbar/Desktop/aqbobek-hub/app/api/student/homework/submissions/route.ts)
-
-Uploads are stored under:
-
-- [public/uploads/homework](/Users/kaliakbar/Desktop/aqbobek-hub/public/uploads/homework)
-
-If a student sends only a note, the system saves a draft submission without a file.
-
-## Teacher Workbench Actions
-
-Current teacher actions are task-driven and visible on the dashboard after refresh.
-
-Implemented actions include:
-
-- generate diagnostic test
-- create support plan
-- notify parents
-- request attendance report
-- open journal task for a lesson
-- mark attendance task for a lesson
-- assign homework task
-- prepare class message
-- review student plan
-- mark task done / reopen task
-- request sick leave
-
-## Verified Smoke Checks
-
-The following were manually rechecked after the latest fixes:
-
-### Pages
-
-- `/student`
-- `/student/schedule`
-- `/student/homework`
-- `/student/profile`
-- `/teacher`
-- `/teacher/schedule`
-- `/teacher/classes`
-- `/teacher/workbench`
-- `/parent`
-- `/admin`
-- `/admin/schedule`
-- `/news`
-- `/leaderboard`
-- `/settings`
-- `/ai-assistant`
-- `/kiosk`
-
-### Working actions
-
-- student activity logging
-- student homework draft submission
-- AI assistant history load and clear
-- profile update
-- settings update
-- password change
-- teacher report generation
-- teacher communications actions
-- teacher task toggle
-- teacher sick leave request
-- admin broadcast creation
-- admin news publication
-- admin approval update
-- admin incident resolution
-- admin local data import
-- admin schedule generation
-- admin schedule publish
-- admin schedule constraints save
-- admin-triggered sick leave reoptimization
-
-### Production checks
+### Финальная проверка через CLI
 
 ```bash
 npm run lint
 npm run build
 ```
 
-Both pass.
-
-## Bugs Fixed During Final Audit
-
-Two real backend issues were fixed during the final pass:
-
-### 1. Constraint save round-trip
-
-Problem:
-
-- `GET /api/admin/schedule/constraints` followed by `POST /api/admin/schedule/constraints` could fail with foreign key errors
-
-Cause:
-
-- rooms and bands were recreated with new IDs
-- related room availability, band members and requirements still referenced old IDs
-
-Fix:
-
-- IDs are now preserved for recreated rooms, bands, band members and requirements
-- constraint saving is now idempotent for normal admin round-trips
-
-### 2. Sick leave reoptimization timeout
-
-Problem:
-
-- teacher or admin sick leave requests could fail with an expired interactive transaction
-
-Cause:
-
-- the plan creation path inside reoptimization was holding the transaction open incorrectly
-
-Fix:
-
-- plan persistence now accepts a transaction client
-- reoptimized published plan creation uses the same transaction correctly
-- transaction timeout was raised for the heavy scheduling flows
-
-## Commands
+## 12. Полезные команды
 
 ```bash
 npm run dev
@@ -570,19 +631,27 @@ npm run db:seed
 npm run db:reset
 ```
 
-## Known Notes
+### Дополнительно
 
-- The AI assistant depends on `GEMINI_API_KEY`.
-- The project still shows two non-blocking framework warnings during build:
-  - Next.js workspace root inference because multiple lockfiles exist on the machine
-  - `middleware.ts` deprecation warning in favor of `proxy`
-- Push notifications in this project are `in-app push`, not browser push.
-- Teacher lesson journal actions are task-backed right now; a fully persisted lesson journal module can still be built as a next step.
+Сгенерировать Prisma client:
 
-## Suggested Next Steps
+```bash
+npx prisma generate
+```
 
-- build a full persisted lesson journal with attendance, lesson topic, homework and teacher notes
-- add teacher-side homework review with feedback and grading
-- improve mobile layout of timetable pages
-- replace the current JSON-like schedule constraints editing with a richer matrix UI
-- add stronger parent navigation with separate progress and attendance pages
+Открыть Prisma Studio:
+
+```bash
+npx prisma studio
+```
+
+## 13. Известные замечания
+
+- `AI-наставник` требует `GEMINI_API_KEY`
+- push-уведомления сейчас реализованы как встроенные уведомления, а не как browser push
+- часть действий учителя пока работает через систему задач, а не через отдельный модуль полноценного журнала урока
+- при `npm run build` возможны framework warnings про:
+  - несколько lockfile на машине
+  - deprecated `middleware` -> `proxy`
+
+Это не ломает работу приложения.
